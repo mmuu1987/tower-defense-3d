@@ -115,7 +115,7 @@ export function makeInstanceWithMaterials(name, targetH, mul = 1) {
 // 各 glb 的场景单位制差异巨大（0.004~300），自动测量不可靠（SkinnedMesh 包围盒受
 // 蒙皮姿势影响）。因此用一次性人工标定的原始高度做归一化，新模型按需补充。
 const ENEMY_RAW_HEIGHT = {
-  robot: 148,        // RobotExpressive（grunt/tank/meadowBoss 使用）
+  robot: 7,          // RobotExpressive（实测 scale=1 渲染高约 7；Box3 的 148 是错误口径）
   horse: 303,        // 疾行者
   bird_parrot: 168,  // 蝠翼
   soldier: 1.75,     // 萨满 / frostBoss（Mixamo 系：骨骼空间≈米制）
@@ -185,8 +185,12 @@ export function loadEnemyTemplate(name, timeoutMs = 20000) {
             const size = box.getSize(new THREE.Vector3());
             const center = box.getCenter(new THREE.Vector3());
             root.position.set(-center.x, -box.min.y, -center.z);
-            // 常数表仅作测量失败时的兜底
-            const height = measured && size.y > 0.0001 ? size.y : (ENEMY_RAW_HEIGHT[name] || Math.max(0.0001, size.y));
+            // 高度：人工标定表绝对优先（蒙皮运行时测量依赖渲染期骨骼矩阵，
+            // 加载时机下 boneMatrices 未初始化会得到随机垃圾值——血的教训）
+            const raw = ENEMY_RAW_HEIGHT[name];
+            const height = raw
+              ? raw
+              : (measured && size.y > 0.0001 ? size.y : Math.max(0.0001, size.y));
             finish({ tpl: root, height, animations: g.animations || [] });
           }, (e) => { report('PARSE-ERROR', e); finish(null); });
         } catch (e) {

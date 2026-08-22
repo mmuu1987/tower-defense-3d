@@ -261,6 +261,11 @@ export class Enemy {
     // 只释放每实例私有的资源；共享几何/材质保留
     this.bar.children.forEach((c) => c.geometry.dispose());
     this.mesh.userData.skin?.dispose();
+    // GLTF 路径：每实例克隆的材质必须释放（几百只累积会显存泄漏 → 帧率高但卡顿）
+    for (const m of this.flashMats) {
+      try { m.dispose(); } catch {}
+    }
+    this.flashMats = [];
   }
 }
 
@@ -406,6 +411,7 @@ export class Tower {
       const aligned = !u.yaw || Math.abs(((Math.atan2(this.target.pos.x - this.pos.x, this.target.pos.z - this.pos.z) - this.aim + Math.PI * 3) % (Math.PI * 2)) - Math.PI) < 0.5;
       if (aligned || this.stats.kind === 'pulse') {
         this.fire(this.target, ctx);
+        this.fireCount = (this.fireCount || 0) + 1; // 诊断计数：定位"塔停射"问题
         this.cooldown = 1 / this.stats.rate;
       }
     }

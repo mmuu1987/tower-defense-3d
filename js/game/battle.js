@@ -140,8 +140,9 @@ export class Battle {
       if (!e.alive) continue;
       e.update(dt, ctx);
       if (e.dist >= this.sampler.total) {
-        // 漏怪：直接移除（无死亡演出）
+        // 漏怪：立即标记清理（否则尸体永久堆积 → 数组膨胀 + 显存泄漏 → 越玩越卡）
         e.alive = false;
+        e.disposed = true;
         this.lives--;
         this.leaks++;
         this.hooks.onLeak?.(e);
