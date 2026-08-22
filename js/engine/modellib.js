@@ -164,13 +164,30 @@ export function loadEnemyTemplate(name, timeoutMs = 20000) {
               if (before !== clip.tracks.length) clip.resetDuration();
             }
             if (stripped) console.log(`[enemy] ${name}: stripped ${stripped} position tracks`);
-            // 高度：优先人工标定常数；未标定时退回世界口径 Box3（含节点缩放）
+            // 高度测量：对 SkinnedMesh 用 getVertexPosition 抽样蒙皮顶点（含骨骼变换），
+            // 这是唯一与最终渲染一致的口径；Box3/骨骼局部包围盒都会因单位制差异而失真。
             root.updateWorldMatrix(true, true);
-            const box = new THREE.Box3().setFromObject(root);
+            const box = new THREE.Box3().setFromObject(root); // 兜底（非蒙皮部分）
+            let measured = false;
+            const v = new THREE.Vector3();
+            root.traverse((o) => {
+              if (!o.isSkinnedMesh || !o.geometry) return;
+              o.skeleton.update?.();
+              const pos = o.geometry.attributes.position;
+              if (!pos) return;
+              const step = Math.max(1, Math.floor(pos.count / 300));
+              for (let i = 0; i < pos.count; i += step) {
+                o.getVertexPosition(i, v);       // 应用 bindMatrix + 骨骼 + morph
+                v.applyMatrix4(o.matrixWorld);
+                box.expandByPoint(v);
+                measured = true;
+              }
+            });
             const size = box.getSize(new THREE.Vector3());
             const center = box.getCenter(new THREE.Vector3());
             root.position.set(-center.x, -box.min.y, -center.z);
-            const height = ENEMY_RAW_HEIGHT[name] || Math.max(0.0001, size.y);
+            // 常数表仅作测量失败时的兜底
+            const height = measured && size.y > 0.0001 ? size.y : (ENEMY_RAW_HEIGHT[name] || Math.max(0.0001, size.y));
             finish({ tpl: root, height, animations: g.animations || [] });
           }, (e) => { report('PARSE-ERROR', e); finish(null); });
         } catch (e) {
@@ -208,7 +225,9 @@ export function makeEnemyInstance(name, targetH, tint = null) {
     return null;
   };
   const walkC = findClip('Walking', 'Walk', 'Running', 'Run', 'gallop', 'flap', 'fly');
-  if (walkC) actions.walk = mixer.clipAction(walkC);
+  // 兜底：动画剪辑名不匹配任何关键词时（如空名/自定义名），直接取第一个剪辑当行走
+  const useWalk = walkC || (e.animations.length ? e.animations[0] : null);
+  if (useWalk) actions.walk = mixer.clipAction(useWalk);
   const deathC = findClip('Death', 'Dying');
   if (deathC) actions.death = mixer.clipAction(deathC);
 
