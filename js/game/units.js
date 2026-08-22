@@ -7,7 +7,7 @@ export const ENEMY_DEFS = {
   runner:   { key:'runner',   name:'疾行者', shape:'runner',   hp:34,  speed:2.8,  armor:0, reward:5,  size:0.28, color:0xd8c04a, fly:false,
               model:{ name:'horse', h:2.1, tint:null, yaw:Math.PI } },
   tank:     { key:'tank',     name:'重甲兽', shape:'tank',     hp:185, speed:0.95, armor:5, reward:14, size:0.46, color:0x707a8a, fly:false,
-              model:{ name:'robot', h:2.6, tint:0x4a5462, yaw:Math.PI } },
+              model:{ name:'robot', h:26, tint:0x4a5462, yaw:Math.PI } },
   flyer:    { key:'flyer',    name:'蝠翼',   shape:'flyer',    hp:46,  speed:2.15, armor:0, reward:8,  size:0.30, color:0x9a6ad8, fly:true,
               model:{ name:'bird_parrot', h:1.3, tint:null, yaw:Math.PI } },
   healer:   { key:'healer',   name:'萨满',   shape:'healer',   hp:85,  speed:1.3,  armor:2, reward:12, size:0.32, color:0x4ac8b8, fly:false,
