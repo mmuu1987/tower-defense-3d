@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>三境守卫 · Tri-Realm Defense</title>
+  <link rel="stylesheet" href="./css/style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/three.module.js",
+        "three/addons/loaders/GLTFLoader.js": "./vendor/three/addons/loaders/GLTFLoader.js",
+        "three/addons/utils/SkeletonUtils.js": "./vendor/three/addons/utils/SkeletonUtils.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <div id="boot-status">正在加载游戏…</div>
+  </div>
+  <script>
+    // 最早期的错误捕获：模块加载失败也能上报
+    window.addEventListener('error', function (e) {
+      try {
+        fetch('/api/log', { method: 'POST',
+          body: '[html-error] ' + e.message + ' @ ' + (e.filename || '') + ':' + e.lineno + ':' + e.colno });
+      } catch {}
+    }, true);
+  </script>
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>

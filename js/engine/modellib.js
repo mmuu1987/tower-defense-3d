@@ -1,0 +1,214 @@
+// 模型库：Kenney glTF 加载 + 归一化（居中/贴地/按高度缩放）+ 失败回退
+// 所有模型来自 Kenney Nature Kit & Tower Defense Kit（CC0）、three.js 官方示例模型（CC0/署名）
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+
+const loader = new GLTFLoader();
+// 模型基准路径：相对本模块解析，任何部署深度都正确（本地/GitHub子路径/itch.io iframe）
+const MODEL_BASE = new URL('../../assets/models/', import.meta.url);
+const cache = {};    // name -> { tpl: Group(已归一化), height: number } | null = 加载失败
+const inflight = {};
+
+export function loadOne(name, timeoutMs = 20000) {
+  // Node/模拟器环境：无 location（页面上下文），直接返回失败占位，走程序化回退
+  if (typeof location === 'undefined') return Promise.resolve(null);
+  if (cache[name] !== undefined) return Promise.resolve(cache[name]);
+  if (!inflight[name]) {
+    inflight[name] = new Promise((resolve) => {
+      let settled = false;
+      const report = (why, err) => {
+        const msg = `[model] ${name} ${why}${err ? ': ' + ((err && (err.message || err)) || err) : ''}`;
+        console.error(msg);
+        try { fetch('/api/log', { method: 'POST', body: msg.slice(0, 500) }).catch(() => {}); } catch {}
+      };
+      const finish = (val) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        cache[name] = val;
+        resolve(val);
+      };
+      const timer = setTimeout(() => { report('TIMEOUT'); finish(null); }, timeoutMs);
+
+      (async () => {
+        try {
+          const res = await fetch(new URL(`${name}.glb`, MODEL_BASE));
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const buf = await res.arrayBuffer();
+          loader.parse(buf, '', (g) => {
+            try {
+              const root = g.scene;
+              const box = new THREE.Box3().setFromObject(root);
+              const size = box.getSize(new THREE.Vector3());
+              const center = box.getCenter(new THREE.Vector3());
+              root.position.set(-center.x, -box.min.y, -center.z);
+              const wrap = new THREE.Group();
+              wrap.add(root);
+              finish({ tpl: wrap, height: Math.max(0.0001, size.y), name });
+            } catch (e) {
+              report('PARSE-THROW', e);
+              finish(null);
+            }
+          }, (e) => {
+            report('PARSE-CALLBACK-ERROR', e);
+            finish(null);
+          });
+        } catch (e) {
+          report('FETCH-FAIL', e);
+          finish(null);
+        }
+      })();
+    });
+  }
+  return inflight[name];
+}
+
+// 预热一批模型；resolve 为加载成功的名字数组
+export function preloadModels(names) {
+  const t0 = performance.now();
+  // 注意：不能直接 names.map(loadOne) —— map 会把索引当第二参数（timeoutMs）传进去！
+  return Promise.all(names.map((n) => loadOne(n))).then((rs) => {
+    const okCount = rs.filter(Boolean).length;
+    const msg = `[model] preload done: ${okCount}/${names.length} ok in ${(performance.now() - t0).toFixed(0)}ms`;
+    console.log(msg);
+    try { fetch('/api/log', { method: 'POST', body: msg }).catch(() => {}); } catch {}
+    return names.filter((_, i) => rs[i]);
+  });
+}
+
+// 是否已成功加载（用于同步决定走模型还是程序化回退）
+export const hasModel = (name) => !!cache[name];
+
+/**
+ * 生成实例（克隆共享几何/材质，性能友好）
+ * @param {string} name
+ * @param {number} [targetH] 目标高度（世界单位）
+ * @param {number} [mul] 额外缩放系数
+ * @returns {Object3D|null}
+ */
+export function makeInstance(name, targetH, mul = 1) {
+  const e = cache[name];
+  if (!e) return null;
+  const o = e.tpl.clone(true);
+  const s = (targetH ? targetH / e.height : 1) * mul;
+  o.scale.setScalar(s);
+  o.traverse((m) => {
+    if (m.isMesh) { m.castShadow = true; m.receiveShadow = false; }
+  });
+  return o;
+}
+
+/** 生成实例并克隆材质（用于需要独立 emissive 动画的个体，如冰晶） */
+export function makeInstanceWithMaterials(name, targetH, mul = 1) {
+  const o = makeInstance(name, targetH, mul);
+  if (!o) return null;
+  o.traverse((m) => {
+    if (m.isMesh && m.material) {
+      m.material = Array.isArray(m.material) ? m.material.map((x) => x.clone()) : m.material.clone();
+    }
+  });
+  return o;
+}
+
+// ———— 敌人模型（骨骼动画）：模板缓存 animations，SkeletonUtils 克隆保骨架 ————
+const enemyCache = {};    // name -> { tpl(归一化), height, animations } | null
+const enemyInflight = {};
+
+export function preloadEnemyModels(names) { return Promise.all(names.map((n) => loadEnemyTemplate(n))).then(() => {}); }
+
+export function loadEnemyTemplate(name, timeoutMs = 20000) {
+  if (typeof location === 'undefined') return Promise.resolve(null);
+  if (enemyCache[name] !== undefined) return Promise.resolve(enemyCache[name]);
+  if (!enemyInflight[name]) {
+    enemyInflight[name] = new Promise((resolve) => {
+      let settled = false;
+      const report = (why, err) => {
+        const msg = `[enemy-model] ${name} ${why}${err ? ': ' + ((err && (err.message || err)) || err) : ''}`;
+        console.error(msg);
+        try { fetch('/api/log', { method: 'POST', body: msg.slice(0, 400) }).catch(() => {}); } catch {}
+      };
+      const finish = (val) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        enemyCache[name] = val;
+        resolve(val);
+      };
+      const timer = setTimeout(() => { report('TIMEOUT'); finish(null); }, timeoutMs);
+      (async () => {
+        try {
+          // modellib 位于 js/engine/ → ../../assets/models/enemies/
+          const url = new URL(`../../assets/models/enemies/${name}.glb`, import.meta.url);
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const buf = await res.arrayBuffer();
+          loader.parse(buf, '', (g) => {
+            const root = g.scene;
+            const box = new THREE.Box3().setFromObject(root);
+            const size = box.getSize(new THREE.Vector3());
+            const center = box.getCenter(new THREE.Vector3());
+            root.position.set(-center.x, -box.min.y, -center.z);
+            finish({ tpl: root, height: Math.max(0.0001, size.y), animations: g.animations || [] });
+          }, (e) => { report('PARSE-ERROR', e); finish(null); });
+        } catch (e) {
+          report('FETCH-FAIL', e);
+          finish(null);
+        }
+      })();
+    });
+  }
+  return enemyInflight[name];
+}
+
+/**
+ * 生成带动画的敌人实例（骨骼克隆 + 每实例材质克隆供受击闪白/减速染色）
+ * @returns {{group:Object3D, mixer:AnimationMixer|null, actions:{walk?:AnimationAction, death?:AnimationAction}, mats:Material[]}|null}
+ */
+export function makeEnemyInstance(name, targetH, tint = null) {
+  const e = enemyCache[name];
+  if (!e) return null;
+  const group = SkeletonUtils.clone(e.tpl);
+  group.scale.setScalar(targetH / e.height);
+  const mixer = new THREE.AnimationMixer(group);
+  const actions = {};
+  const findClip = (...patterns) => {
+    for (const p of patterns) {
+      const c = THREE.AnimationClip.findByName(e.animations, p);
+      if (c) return c;
+    }
+    // 正则兜底
+    for (const p of patterns) {
+      const re = new RegExp(p, 'i');
+      const c = e.animations.find((a) => re.test(a.name));
+      if (c) return c;
+    }
+    return null;
+  };
+  const walkC = findClip('Walking', 'Walk', 'Running', 'Run', 'gallop', 'flap', 'fly');
+  if (walkC) actions.walk = mixer.clipAction(walkC);
+  const deathC = findClip('Death', 'Dying');
+  if (deathC) actions.death = mixer.clipAction(deathC);
+
+  const mats = [];
+  group.traverse((m) => {
+    if (m.isMesh) {
+      m.castShadow = true;
+      m.frustumCulled = false; // 骨骼动画包围盒计算易误剔除
+      if (m.material) {
+        m.material = Array.isArray(m.material) ? m.material.map((x) => x.clone()) : m.material.clone();
+        (Array.isArray(m.material) ? m.material : [m.material]).forEach((mm) => {
+          if (tint != null && mm.color) mm.color.lerp(new THREE.Color(tint), 0.55);
+          mats.push(mm);
+        });
+      }
+    }
+  });
+
+  if (actions.walk) actions.walk.play();
+  else if (actions.death) { /* 无行走动画的模型死亡时再播 */ }
+
+  return { group, mixer, actions, mats };
+}
+/** 预热状态查询（同步判断是否可用） */
+export const hasEnemyModel = (name) => !!enemyCache[name];
