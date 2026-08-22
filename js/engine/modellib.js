@@ -177,8 +177,7 @@ export function loadEnemyTemplate(name, timeoutMs = 20000) {
               if (!pos) return;
               const step = Math.max(1, Math.floor(pos.count / 300));
               for (let i = 0; i < pos.count; i += step) {
-                o.getVertexPosition(i, v);       // 应用 bindMatrix + 骨骼 + morph
-                v.applyMatrix4(o.matrixWorld);
+                o.getVertexPosition(i, v); // r160: 已应用 bindMatrix+骨骼+modelWorld → 世界坐标
                 box.expandByPoint(v);
                 measured = true;
               }
