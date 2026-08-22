@@ -112,6 +112,15 @@ export function makeInstanceWithMaterials(name, targetH, mul = 1) {
 }
 
 // ———— 敌人模型（骨骼动画）：模板缓存 animations，SkeletonUtils 克隆保骨架 ————
+// 各 glb 的场景单位制差异巨大（0.004~300），自动测量不可靠（SkinnedMesh 包围盒受
+// 蒙皮姿势影响）。因此用一次性人工标定的原始高度做归一化，新模型按需补充。
+const ENEMY_RAW_HEIGHT = {
+  robot: 148,        // RobotExpressive（grunt/tank/meadowBoss 使用）
+  horse: 303,        // 疾行者
+  bird_parrot: 168,  // 蝠翼
+  soldier: 1.75,     // 萨满 / frostBoss（Mixamo 系：骨骼空间≈米制）
+  xbot: 1.78,        // 裂变体 / lavaBoss
+};
 const enemyCache = {};    // name -> { tpl(归一化), height, animations } | null
 const enemyInflight = {};
 
@@ -155,11 +164,14 @@ export function loadEnemyTemplate(name, timeoutMs = 20000) {
               if (before !== clip.tracks.length) clip.resetDuration();
             }
             if (stripped) console.log(`[enemy] ${name}: stripped ${stripped} position tracks`);
+            // 高度：优先人工标定常数；未标定时退回世界口径 Box3（含节点缩放）
+            root.updateWorldMatrix(true, true);
             const box = new THREE.Box3().setFromObject(root);
             const size = box.getSize(new THREE.Vector3());
             const center = box.getCenter(new THREE.Vector3());
             root.position.set(-center.x, -box.min.y, -center.z);
-            finish({ tpl: root, height: Math.max(0.0001, size.y), animations: g.animations || [] });
+            const height = ENEMY_RAW_HEIGHT[name] || Math.max(0.0001, size.y);
+            finish({ tpl: root, height, animations: g.animations || [] });
           }, (e) => { report('PARSE-ERROR', e); finish(null); });
         } catch (e) {
           report('FETCH-FAIL', e);
