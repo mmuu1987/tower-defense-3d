@@ -109,11 +109,42 @@ export async function buildTerrain({ theme, map }) {
   const group = new THREE.Group();
   const halfW = GRID.w / 2, halfH = GRID.h / 2;
 
-  // 1) 地面（分段平面 + 顶点色噪声渐变，破除平铺重复感）
+  // 2) 路径世界坐标点与段表（提前计算，供地面“路径区压平”使用）
+  const pts = map.waypoints.map(([cx, cz]) => ({ x: cellToWorldX(cx), z: cellToWorldZ(cz) }));
+  const psegs = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    const dx = b.x - a.x, dz = b.z - a.z;
+    const len = Math.hypot(dx, dz) || 1;
+    psegs.push({ ax: a.x, az: a.z, dx: dx / len, dz: dz / len, len });
+  }
+  const distToPath = (wx, wz) => {
+    let best = Infinity;
+    for (const s of psegs) {
+      const t = THREE.MathUtils.clamp((wx - s.ax) * s.dx + (wz - s.az) * s.dz, 0, s.len);
+      const dd = Math.hypot(wx - (s.ax + s.dx * t), wz - (s.az + s.dz * t));
+      if (dd < best) best = dd;
+    }
+    return best;
+  };
+
+  // 路径格子集合（供建造判定与装饰避让）
+  const pathCells = new Set();
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    const steps = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / (GRID.cell * 0.22));
+    for (let s = 0; s <= steps; s++) {
+      const x = a.x + (b.x - a.x) * (s / steps);
+      const z = a.z + (b.z - a.z) * (s / steps);
+      const { cx, cz } = worldToCell(x, z);
+      pathCells.add(`${cx},${cz}`);
+    }
+  }
+
+  // 1) 地面（分段平面 + 大块色斑渐变 + 轻微起伏；路径附近自动压平）
   const groundTex = await loadTexture(theme.groundTex, theme.groundFallback, [20, 15]);
   const GW = GRID.w + 40, GH = GRID.h + 34;
-  const groundGeo = new THREE.PlaneGeometry(GW, GH, 48, 36);
-  // 简易 value noise：多频正弦叠加 + 网格哈希
+  const groundGeo = new THREE.PlaneGeometry(GW, GH, 56, 42);
   const noise = (x, z) => {
     let v = 0;
     v += Math.sin(x * 0.32 + Math.sin(z * 0.21) * 2.1) * 0.5;
@@ -125,14 +156,19 @@ export async function buildTerrain({ theme, map }) {
     const posA = groundGeo.attributes.position;
     const colors = new Float32Array(posA.count * 3);
     const base = new THREE.Color(theme.groundTint);
+    const dark = new THREE.Color(theme.id === 'meadow' ? 0x3f6b2e : theme.id === 'lava' ? 0x2a1512 : 0xbcd4e6);
     const c = new THREE.Color();
     for (let i = 0; i < posA.count; i++) {
-      const x = posA.getX(i), y = posA.getY(i); // 平面局部坐标（未旋转）
-      const n = noise(x * 1.1, y * 1.1) * 0.5 + noise(x * 3.7, y * 3.7) * 0.25; // [-0.75,0.75]
-      c.copy(base).multiplyScalar(THREE.MathUtils.clamp(1 + n * 0.16, 0.78, 1.18));
+      const lx = posA.getX(i), ly = posA.getY(i); // 平面局部坐标
+      const wx = lx, wz = -ly;                    // rotateX(-90°) 对应关系
+      const dpath = distToPath(wx, wz);
+      const flat = THREE.MathUtils.clamp((dpath - 0.85) / 1.4, 0, 1); // 路径旁 0 → 远处 1
+      const nBig = noise(lx * 0.16 + 31.7, ly * 0.16 - 12.3);          // 低频大色斑
+      const nSmall = noise(lx * 1.1, ly * 1.1) * 0.5 + noise(lx * 3.7, ly * 3.7) * 0.25;
+      c.copy(base).multiplyScalar(THREE.MathUtils.clamp(1 + nSmall * 0.14, 0.8, 1.15));
+      c.lerp(dark, THREE.MathUtils.clamp(nBig * 0.5 + 0.28, 0, 0.55) * flat * 0.85);
       colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
-      // 轻微起伏（远处更明显，路径区域保持平整由后续 offset 覆盖不了——幅度很小不影响建造）
-      posA.setZ(i, noise(x * 0.6, y * 0.6) * 0.06);
+      posA.setZ(i, noise(lx * 0.6, ly * 0.6) * 0.22 * flat); // 起伏，路径区压平
     }
     groundGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     groundGeo.computeVertexNormals();
@@ -147,44 +183,28 @@ export async function buildTerrain({ theme, map }) {
   ground.receiveShadow = true;
   group.add(ground);
 
-  // 1b) 悬崖围边：Kenney cliff 模型沿地图四周排列（装饰性，不阻挡）
+  // 1b) 悬崖围边：Kenney cliff 模型沿地图四周排列（更近更密更高）
   try {
     const { hasModel: _h, makeInstance: _m } = await import('./modellib.js');
     if (_h('border_cliff')) {
-      const margin = 4.4;
+      const margin = 3.3;
       const spots = [];
-      for (let x = -halfW - 1.5; x <= halfW + 1.5; x += 1.05) {
+      for (let x = -halfW - 1.2; x <= halfW + 1.2; x += 0.92) {
         spots.push([x, -halfH - margin], [x, halfH + margin]);
       }
-      for (let z = -halfH - 1; z <= halfH + 1; z += 1.05) {
-        spots.push([-halfW - margin + 0.5, z], [halfW + margin - 0.5, z]);
+      for (let z = -halfH - 0.8; z <= halfH + 0.8; z += 0.92) {
+        spots.push([-halfW - margin + 0.4, z], [halfW + margin - 0.4, z]);
       }
       for (const [x, z] of spots) {
-        if (Math.random() < 0.22) continue;
-        const inst = _m('border_cliff', 0.9 + Math.random() * 0.5);
+        if (Math.random() < 0.08) continue;
+        const inst = _m('border_cliff', 1.25 + Math.random() * 0.7);
         if (!inst) break;
-        inst.position.set(x, -0.35, z);
+        inst.position.set(x, -0.45, z);
         inst.rotation.y = Math.floor(Math.random() * 4) * (Math.PI / 2) + (Math.random() - 0.5) * 0.3;
         group.add(inst);
       }
     }
   } catch { /* 模型不可用则跳过 */ }
-
-  // 2) 路径世界坐标点
-  const pts = map.waypoints.map(([cx, cz]) => ({ x: cellToWorldX(cx), z: cellToWorldZ(cz) }));
-
-  // 路径格子集合（供建造判定与装饰避让）
-  const pathCells = new Set();
-  for (let i = 0; i < pts.length - 1; i++) {
-    const a = pts[i], b = pts[i + 1];
-    const steps = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / (GRID.cell * 0.22));
-    for (let s = 0; s <= steps; s++) {
-      const x = a.x + (b.x - a.x) * (s / steps);
-      const z = a.z + (b.z - a.z) * (s / steps);
-      const { cx, cz } = worldToCell(x, z);
-      pathCells.add(`${cx},${cz}`);
-    }
-  }
 
   // 3) 路径丝带：泥土肩带 → 深色描边 → 主路面（三层层次感）
   const dirtMat = new THREE.MeshStandardMaterial({ color: theme.pathTint, roughness: 1 });
