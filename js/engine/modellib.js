@@ -145,6 +145,16 @@ export function loadEnemyTemplate(name, timeoutMs = 20000) {
           const buf = await res.arrayBuffer();
           loader.parse(buf, '', (g) => {
             const root = g.scene;
+            // 关键：剥掉动画中的位移轨道（root motion）——否则马/机器人会"跑出"
+            // 自己的逻辑位置，造成塔打空气、模型"消失"的假象。只保留旋转/缩放。
+            let stripped = 0;
+            for (const clip of g.animations || []) {
+              const before = clip.tracks.length;
+              clip.tracks = clip.tracks.filter((tr) => !/\.position$/.test(tr.name));
+              stripped += before - clip.tracks.length;
+              if (before !== clip.tracks.length) clip.resetDuration();
+            }
+            if (stripped) console.log(`[enemy] ${name}: stripped ${stripped} position tracks`);
             const box = new THREE.Box3().setFromObject(root);
             const size = box.getSize(new THREE.Vector3());
             const center = box.getCenter(new THREE.Vector3());
