@@ -13,6 +13,7 @@ const PRELOAD = [
   'stump_old', 'log', 'crystal_large', 'path_stone',
   'weapon_ballista', 'weapon_cannon', 'weapon_turret', 'tower_crystals',
   'ruin_obelisk', 'ruin_column', 'ruin_ring', 'campfire_stones', 'campfire_logs',
+  'cactus_short', 'cactus_tall',
 ];
 export function initDecorModels() { return preloadModels(PRELOAD); }
 
@@ -71,6 +72,7 @@ export function scatterDecor({ theme, pathCells, seed = 12345, pathPts = null })
     pine: 22, crystal: 12, snowRock: 8,
     bush: 9, tuft: 32, mushroom: 5,
     ruin: 4, campfire: 3, iceStatue: 4,
+    cactus: 18,
   };
   // 模型实例队列：{name,x,z,h,ry,mul,mats?}
   const modelQueue = [];
@@ -174,6 +176,11 @@ export function scatterDecor({ theme, pathCells, seed = 12345, pathPts = null })
         case 'ruin': {
           // 草原远古遗迹：方尖碑/石柱/石环
           tryModel([pickOne(rng, ['ruin_obelisk', 'ruin_column', 'ruin_column', 'ruin_ring'])], x, z, 0.95, 0.45);
+          break;
+        }
+        case 'cactus': {
+          // 黄沙戈壁：仙人掌（Kenney CC0），缺失则跳过
+          tryModel([pickOne(rng, ['cactus_tall', 'cactus_short', 'cactus_short'])], x, z, 0.9, 0.55);
           break;
         }
         case 'campfire': {

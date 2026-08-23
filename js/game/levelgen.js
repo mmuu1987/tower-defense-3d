@@ -1,4 +1,4 @@
-// 30 关难度曲线：世界 w(0..2) 关卡 l(0..9)，d = w*10+l 为难度分
+// 40 关难度曲线：世界 w(0..3) 关卡 l(0..9)，d = w*10+l 为难度分
 import { ENEMY_DEFS, BOSS_DEFS } from './units.js';
 import { mapForLevel } from './maps.js';
 
@@ -16,6 +16,12 @@ export function buildLevel(worldIdx, lvlIdx) {
   if (d >= 5) pool.push('flyer');
   if (d >= 8) pool.push('healer');
   if (d >= 12) pool.push('splitter');
+  // —— 扩充包：新怪物按难度逐步入池 ——
+  if (d >= 13) pool.push('fox');
+  if (d >= 15) pool.push('flamingo');
+  if (d >= 17) pool.push('mummy');
+  if (d >= 19) pool.push('stork');
+  if (d >= 21) pool.push('dancer');
 
   const waves = [];
   for (let w = 0; w < waveCount; w++) {

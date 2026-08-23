@@ -120,6 +120,19 @@ const ENEMY_RAW_HEIGHT = {
   bird_parrot: 168,  // 蝠翼
   soldier: 1.75,     // 萨满 / frostBoss（Mixamo 系：骨骼空间≈米制）
   xbot: 1.78,        // 裂变体 / lavaBoss
+  // —— 扩充包（Rome 鸟类 bbox 被离群顶点撑大，必须人工标定；见 tools/birdiag.mjs）——
+  fox: 79,           // 灵狐（运行时蒙皮实测 79.03，Walk 剪辑）
+  cesiumman: 1.64,   // 干尸行者（加载期实测 1.64；行走蹲姿 1.51）
+  brainstem: 1.83,   // 机械舞者（舞蹈姿势运行时实测 1.83；绑定姿势 2.18）
+  bird_flamingo: 82, // 烈焰鸟（分位数鸟身 81.7；bbox 416 是离群顶点口径）
+  bird_stork: 70,    // 苍鹳（按翼展比例标定：raw=70 时翼展≈3.6 身长≈3.0；26.5 会变巨鸟）
+};
+
+// Y 轴居中修正：Rome 鸟类 bbox 含离群顶点 → 默认居中把鸟身推离原点。
+// 数值 = 默认居中后"鸟身底部"相对原点的偏移（模板空间），负值下移贴回原点。
+const ENEMY_DY_FIX = {
+  bird_flamingo: -66.9,
+  bird_stork: -286.1,
 };
 const enemyCache = {};    // name -> { tpl(归一化), height, animations } | null
 const enemyInflight = {};
@@ -185,6 +198,8 @@ export function loadEnemyTemplate(name, timeoutMs = 20000) {
             const size = box.getSize(new THREE.Vector3());
             const center = box.getCenter(new THREE.Vector3());
             root.position.set(-center.x, -box.min.y, -center.z);
+            const dyFix = ENEMY_DY_FIX[name];
+            if (dyFix) root.position.y += dyFix;
             // 高度：人工标定表绝对优先（蒙皮运行时测量依赖渲染期骨骼矩阵，
             // 加载时机下 boneMatrices 未初始化会得到随机垃圾值——血的教训）
             const raw = ENEMY_RAW_HEIGHT[name];

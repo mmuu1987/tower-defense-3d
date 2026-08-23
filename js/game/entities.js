@@ -283,6 +283,7 @@ export class Tower {
     this.target = null;
     this.retarget = 0;
     this.aim = 0;
+    this._aimDiff = 0; // 当前瞄准误差（wrap 到 [-π,π]，供开火对齐判定复用）
 
     this.pos = new THREE.Vector3(0, 0, 0);
     this.mesh = createTowerMesh(key, 0);
@@ -404,11 +405,16 @@ export class Tower {
       while (diff < -Math.PI) diff += Math.PI * 2;
       this.aim += diff * Math.min(1, dt * 10);
       u.yaw.rotation.y = this.aim;
+      this._aimDiff = diff; // 与追踪同一套 wrap 的当前误差（修复开火判定）
+      // aim 会随持续追踪累积多圈；过大时归一化（mod 2π 渲染方向不变）
+      if (Math.abs(this.aim) > 64) this.aim %= Math.PI * 2;
     }
 
     this.cooldown -= dt;
     if (this.target && this.cooldown <= 0) {
-      const aligned = !u.yaw || Math.abs(((Math.atan2(this.target.pos.x - this.pos.x, this.target.pos.z - this.pos.z) - this.aim + Math.PI * 3) % (Math.PI * 2)) - Math.PI) < 0.5;
+      // 旧写法 ((want-aim+3π)%2π)-π 在 aim 累计满圈后遇 JS 负余数会把 0 误差算成 ±2π，
+      // 导致塔永远"未对齐"不开火（有寻敌动作但不射击）。现复用追踪的 wrap 误差。
+      const aligned = !u.yaw || Math.abs(this._aimDiff ?? 0) < 0.5;
       if (aligned || this.stats.kind === 'pulse') {
         this.fire(this.target, ctx);
         this.fireCount = (this.fireCount || 0) + 1; // 诊断计数：定位"塔停射"问题
@@ -446,7 +452,11 @@ export class Projectiles {
     const mesh = this._mesh(opts.kind || 'arrow');
     mesh.position.copy(from);
     this.scene.add(mesh);
-    this.list.push({ mode: 'homing', mesh, target, dmg, speed, pierce: opts.pierce, last: target.pos.clone(), alive: true });
+    this.list.push({
+      mode: 'homing', mesh, target, dmg,
+      speed: Number.isFinite(speed) && speed > 0 ? speed : 12, // 防御：非法速度回退，避免 NaN 弹体
+      pierce: opts.pierce, last: target.pos.clone(), alive: true,
+    });
   }
 
   spawnMortar(from, impact, dmg, splash, flight) {
@@ -462,6 +472,11 @@ export class Projectiles {
   update(dt, ctx) {
     for (const p of this.list) {
       if (!p.alive) continue;
+      // 防御性回收：坐标非有限（NaN 污染）或超龄的弹丸立即移除，
+      // 避免"永久卡死弹体"无限累积 → 列表膨胀 + 粒子池被 NaN 洗成不可见
+      p.age = (p.age || 0) + dt;
+      const pp = p.mesh.position;
+      if (p.age > 8 || !Number.isFinite(pp.x + pp.y + pp.z)) { p.alive = false; continue; }
       if (p.mode === 'homing') {
         if (p.target?.alive) p.last.copy(p.target.pos).y += 0.45;
         const pos = p.mesh.position;
@@ -675,6 +690,7 @@ export class FxLayer {
 
   /** 爆炸焦痕贴花（循环复用 20 块） */
   decal(pos, size) {
+    if (typeof document === 'undefined') return; // Node/无头模拟环境：跳过 DOM 贴花
     if (!this._decalInit) {
       this._decalInit = true;
       const cv = document.createElement('canvas');

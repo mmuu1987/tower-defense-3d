@@ -33,6 +33,15 @@ export const THEMES = [
     pathTint: 0x9fb4c8, accent: 0x7ad8ff,
     decor: ['pine', 'crystal', 'snowRock', 'iceStatue'],
   },
+  {
+    id: 'sand', name: '黄沙戈壁',
+    skyTop: 0x3f74c9, skyBottom: 0xf7e3c0, fog: 0xe8d5ae, fogNear: 32, fogFar: 130,
+    sunColor: 0xffe8b0, sunIntensity: 3.1,
+    hemiSky: 0xd9c9a8, hemiGround: 0x8a6f4d, hemiIntensity: 0.75,
+    groundTex: '', groundFallback: 'sand', groundTint: 0xd8b98a,
+    pathTint: 0xb99b6b, accent: 0xffb347,
+    decor: ['cactus', 'rock', 'ruin', 'deadTree'],
+  },
 ];
 
 export const QUALITY_PRESETS = {

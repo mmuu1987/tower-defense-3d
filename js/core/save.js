@@ -41,7 +41,7 @@ export const save = {
   },
 
   nextLevel() {
-    for (let w = 0; w < 3; w++) {
+    for (let w = 0; w < 4; w++) {
       for (let l = 0; l < 10; l++) {
         if (!this.isUnlocked(w, l)) return null;
         if (this.getStars(w, l) === 0) return { w, l };

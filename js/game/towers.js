@@ -46,6 +46,7 @@ export const TOWER_KEYS = Object.keys(TOWER_DEFS);
 export function statsFor(key, level) {
   const d = TOWER_DEFS[key];
   const s = {
+    kind: d.kind, // 攻击方式必须随等级快照携带：fire()/update() 依赖 s.kind 分支
     dmg: d.dmg, rate: d.rate, range: d.range, splash: d.splash,
     slow: d.slow, chains: d.chains, pierce: d.pierce,
     projSpeed: d.projSpeed, targets: d.targets,

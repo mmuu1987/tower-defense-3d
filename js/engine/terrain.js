@@ -31,15 +31,31 @@ function proceduralTexture(kind) {
       g.fillStyle = `rgb(${v + 12},${v},${v - 6})`;
       g.beginPath(); g.arc(Math.random() * s, Math.random() * s, 1 + Math.random() * 2.2, 0, 7); g.fill();
     }
-  } else { // snow
+  } else if (kind === 'snow') { // snow
     g.fillStyle = '#e8f0f8'; g.fillRect(0, 0, s, s);
     for (let i = 0; i < 1400; i++) {
       const v = 225 + Math.random() * 30 | 0;
       g.fillStyle = `rgb(${v - 14},${v - 6},${v})`;
       g.fillRect(Math.random() * s, Math.random() * s, 2.5, 2.5);
     }
-  }
-  const t = new THREE.CanvasTexture(cv);
+  } else { // sand（黄沙戈壁）
+    g.fillStyle = '#d8b98a'; g.fillRect(0, 0, s, s);
+    for (let i = 0; i < 2200; i++) {
+      const v = 200 + Math.random() * 45 | 0;
+      g.fillStyle = `rgb(${v + 16 | 0},${v - 12 | 0},${v - 52 | 0})`;
+      g.fillRect(Math.random() * s, Math.random() * s, 2, 2);
+    }
+    // 风纹：几条淡色水平波纹
+    g.strokeStyle = 'rgba(190,155,105,0.5)';
+    g.lineWidth = 3;
+    for (let i = 0; i < 7; i++) {
+      g.beginPath();
+      const y0 = Math.random() * s;
+      g.moveTo(0, y0);
+      g.bezierCurveTo(s * 0.3, y0 - 12, s * 0.6, y0 + 12, s, y0);
+      g.stroke();
+    }
+  }  const t = new THREE.CanvasTexture(cv);
   return t;
 }
 
@@ -156,7 +172,12 @@ export async function buildTerrain({ theme, map }) {
     const posA = groundGeo.attributes.position;
     const colors = new Float32Array(posA.count * 3);
     const base = new THREE.Color(theme.groundTint);
-    const dark = new THREE.Color(theme.id === 'meadow' ? 0x3f6b2e : theme.id === 'lava' ? 0x2a1512 : 0xbcd4e6);
+    const dark = new THREE.Color(
+      theme.id === 'meadow' ? 0x3f6b2e
+        : theme.id === 'lava' ? 0x2a1512
+        : theme.id === 'sand' ? 0x8a6f42
+        : 0xbcd4e6,
+    );
     const c = new THREE.Color();
     for (let i = 0; i < posA.count; i++) {
       const lx = posA.getX(i), ly = posA.getY(i); // 平面局部坐标

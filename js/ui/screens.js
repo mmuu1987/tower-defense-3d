@@ -25,7 +25,7 @@ export function createMenu({ onPlay, onSelect, onSettings }) {
 }
 
 export function createSelect({ save, onStart, onBack, onSettings }) {
-  const WORLD_NAMES = ['翠谷草原', '熔岩荒地', '霜寒要塞'];
+  const WORLD_NAMES = ['翠谷草原', '熔岩荒地', '霜寒要塞', '黄沙戈壁'];
   const root = document.createElement('div');
   root.id = 'screen-select';
   root.innerHTML = `
@@ -33,7 +33,7 @@ export function createSelect({ save, onStart, onBack, onSettings }) {
       <div class="sel-head">
         <button id="s-back">← 返回</button>
         <h2>选择关卡</h2>
-        <span id="s-stars">⭐ 0/90</span>
+        <span id="s-stars">⭐ 0/120</span>
         <button id="s-settings">⚙</button>
       </div>
       <div id="s-tabs"></div>
@@ -71,7 +71,7 @@ export function createSelect({ save, onStart, onBack, onSettings }) {
       grid.appendChild(card);
     }
     root.querySelector('#s-stars').textContent =
-      `⭐ ${save.totalStars()}/90`;
+      `⭐ ${save.totalStars()}/120`;
   }
 
   function render() { renderTabs(); renderGrid(); }
