@@ -1,6 +1,6 @@
 // 敌人图鉴：数值 + 程序化造型
 // 敌人图鉴：数值 + 模型（Kenney/three.js CC0 动画模型）+ 程序化回退造型
-// model.name 对应 assets/models/enemies/<name>.glb；yaw 为朝向补偿（截图校准）
+// model.name 对应 assets/models/enemies/<name>.dat（glTF-Binary，曾用 .glb 后缀）；yaw 为朝向补偿（截图校准）
 export const ENEMY_DEFS = {
   grunt:    { key:'grunt',    name:'哥布林', shape:'imp',      hp:52,  speed:1.5,  armor:0, reward:6,  size:0.34, color:0x7aa03a, fly:false,
               model:{ name:'robot', h:1.65, tint:null, yaw:Math.PI } },

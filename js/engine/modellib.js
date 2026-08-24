@@ -33,7 +33,8 @@ export function loadOne(name, timeoutMs = 20000) {
 
       (async () => {
         try {
-          const res = await fetch(new URL(`${name}.glb`, MODEL_BASE));
+          // .dat = glTF-Binary 改名（4399 上传包扩展名白名单不含 .glb，内容不变）
+          const res = await fetch(new URL(`${name}.dat`, MODEL_BASE));
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const buf = await res.arrayBuffer();
           loader.parse(buf, '', (g) => {
@@ -161,7 +162,7 @@ export function loadEnemyTemplate(name, timeoutMs = 20000) {
       (async () => {
         try {
           // modellib 位于 js/engine/ → ../../assets/models/enemies/
-          const url = new URL(`../../assets/models/enemies/${name}.glb`, import.meta.url);
+          const url = new URL(`../../assets/models/enemies/${name}.dat`, import.meta.url);
           const res = await fetch(url);
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const buf = await res.arrayBuffer();
