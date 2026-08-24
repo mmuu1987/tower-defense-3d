@@ -64,10 +64,14 @@ canvas{ display:block; }
 @keyframes bpop{ from{ transform:translateX(-50%) scale(.6); opacity:0 } }
 
 /* ———— 移动端 / 小屏适配 ———— */
+@media (max-width:1000px){
+  /* 窄窗（含手机横竖屏）：按钮行换到资源条下方，不再与左侧资源条同排对撞 */
+  #hud-actions{ top:52px; flex-wrap:wrap; justify-content:flex-end; max-width:70vw; }
+}
 @media (max-width:820px){
   #fps{ display:none; } /* 开发诊断项，小屏让位给 HUD */
   #hud-top{ left:8px; top:8px; gap:10px; padding:6px 10px; font-size:12.5px; }
-  #hud-actions{ right:8px; top:8px; gap:6px; }
+  #hud-actions{ right:8px; top:52px; gap:6px; }
   #hud-actions button{ padding:6px 9px; font-size:12.5px; border-radius:8px; }
   #hud-dock{ bottom:8px; gap:6px; }
   .dock-card{ width:58px; padding:6px 2px; font-size:12px; border-radius:8px; }
@@ -88,6 +92,7 @@ canvas{ display:block; }
   #hud-panel{ bottom:60px; }
   #hud-hint{ bottom:56px; }
   #hud-cancel{ bottom:84px; }
+  #hud-actions{ top:44px; }
 }
 
 /* ———— M4 打击感：飘字 / 红闪 / 金币脉冲 ———— */
