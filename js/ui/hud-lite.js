@@ -45,7 +45,7 @@ export function createHud(battle, { audio, onSpeed, onQuit, onPause }) {
   for (const d of DOCK) {
     const b = document.createElement('button');
     b.className = 'dock-card';
-    b.innerHTML = `<b>${d.name}</b><i>${d.cost}</i>`;
+    b.innerHTML = `<b>${d.name}</b><i>${d.cost}</i><em>再点取消</em>`;
     b.onclick = () => { audio?.click(); battle.selectBuild(battle.selectedType === d.key ? null : d.key); };
     dock.appendChild(b);
     cards[d.key] = { b, cost: d.cost };

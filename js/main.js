@@ -157,6 +157,10 @@ async function init() {
 
   const settingsPanel = createSettingsPanel({
     save, audio, applyQuality,
+    onReplayTutorial: () => {
+      if (mode === 'battle' && battle) startTutorial(); // 战斗中直接重开引导
+      else { save.data.tutorialDone = false; save.persist(); } // 否则下次进战斗触发
+    },
   });
 
   const menu = createMenu({
@@ -209,28 +213,67 @@ async function init() {
     discMat.color.setHex(color);
   }
 
-  // 教学步骤
-  let tutEl = null, tutSteps = null;
+  // 教学步骤（首次进入 1-1 时自动开启；glow = 需要高亮的选择器；enter = 成为当前步时执行一次）
+  let tutEl = null, tutSteps = null, tutGlowEl = null, tutCurIdx = -1;
   function startTutorial() {
+    if (tutEl) return; // 防重复开启
     tutSteps = [
-      { text: '① 点击下方「箭塔」按钮选择建造', done: () => battle.selectedType === 'arrow' },
-      { text: '② 点击路径旁的绿色草地放置箭塔', done: () => battle.towers.length >= 1 },
-      { text: '③ 点击右下「开始下一波」，保卫基地！', done: () => battle.waveIdx >= 0 },
+      {
+        text: '欢迎守卫者！敌人沿小路进攻，冲进红色传送门就输了。先点下方【箭塔】选中最便宜的塔（选错了？再点一次它、或点 ✕ 取消建造）',
+        // 单调条件：建塔后 selectedType 会被 tryPlace→selectTower 清空，纯查 selectedType 会倒退回本步
+        done: () => battle.selectedType === 'arrow' || battle.towers.length >= 1,
+        glow: '.dock-card',
+      },
+      {
+        text: '现在点击小路旁的绿色草地，把箭塔放在转弯处最划算',
+        done: () => battle.towers.length >= 1,
+      },
+      {
+        text: '塔就位！点右下【开始下一波】，放敌人进来',
+        done: () => battle.waveIdx >= 0, glow: '#btn-wave',
+        enter: () => battle.clearSelection(), // 建完自动退出建造模式，方便下一步点塔升级
+      },
+      {
+        text: '点击刚建好的塔：可以花金币升级（伤害更高）或不划算时出售',
+        done: () => !!battle.selectedTower,
+      },
+      {
+        text: '击杀敌人赚金币，❤️ 生命归零即失败，满生命通关得三星。去战斗吧，守卫者！',
+        done: () => false, final: true,
+      },
     ];
+    tutCurIdx = -1;
     tutEl = document.createElement('div');
     tutEl.id = 'tutorial';
-    tutEl.innerHTML = `<span id="tut-text"></span><button id="tut-skip">跳过</button>`;
+    tutEl.innerHTML = `<span id="tut-text"></span><button id="tut-next" class="hidden">开战！</button><button id="tut-skip">跳过引导</button>`;
     document.body.appendChild(tutEl);
     tutEl.querySelector('#tut-skip').onclick = () => endTutorial();
+    tutEl.querySelector('#tut-next').onclick = () => endTutorial();
   }
   function tickTutorial() {
     if (!tutEl || !battle) return;
-    const cur = tutSteps.find((s) => !s.done());
-    if (!cur) { endTutorial(); return; }
+    const idx = tutSteps.findIndex((s) => !s.done());
+    if (idx === -1) { endTutorial(); return; }
+    if (idx !== tutCurIdx) { // 步骤切换：执行进入动作
+      tutCurIdx = idx;
+      tutSteps[idx].enter?.();
+    }
+    const cur = tutSteps[idx];
     tutEl.querySelector('#tut-text').textContent = cur.text;
+    tutEl.querySelector('#tut-next').classList.toggle('hidden', !cur.final);
+    // 高亮目标元素（每帧校正，元素被隐藏/重建也能恢复）
+    const el = cur.glow ? document.querySelector(cur.glow) : null;
+    if (el !== tutGlowEl) {
+      tutGlowEl?.classList.remove('tut-glow');
+      el?.classList.add('tut-glow');
+      tutGlowEl = el || null;
+    }
   }
   function endTutorial() {
-    tutEl?.remove(); tutEl = null;
+    if (!tutEl) return; // 关键：没在教学中（如 enterBattle 开头的例行 exitBattle）不得误标"已完成"
+    tutGlowEl?.classList.remove('tut-glow');
+    tutGlowEl = null;
+    tutEl.remove(); tutEl = null; tutSteps = null;
     save.markTutorialDone();
   }
 
@@ -388,7 +431,12 @@ async function init() {
     }
   }
   renderer.domElement.addEventListener('pointerdown', (ev) => {
-    if (ev.button !== 0 || ev.pointerType === 'touch') return; // 触摸走手势层
+    if (ev.pointerType === 'touch') return; // 触摸走手势层
+    if (ev.button === 2) { // 右键：取消建造/取消选中（提示文案承诺过的行为）
+      if (mode === 'battle' && battle && !paused) battle.clearSelection();
+      return;
+    }
+    if (ev.button !== 0) return;
     placeOrSelect(ev.clientX, ev.clientY);
   });
   renderer.domElement.addEventListener('pointermove', (ev) => {

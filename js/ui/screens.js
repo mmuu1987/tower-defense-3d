@@ -142,7 +142,7 @@ export function createSelect({ save, onStart, onBack, onSettings }) {
 }
 
 // 设置面板（主菜单与暂停菜单共用）
-export function createSettingsPanel({ save, audio, applyQuality }) {
+export function createSettingsPanel({ save, audio, applyQuality, onReplayTutorial }) {
   const root = document.createElement('div');
   root.id = 'panel-settings';
   root.className = 'modal hidden';
@@ -161,6 +161,7 @@ export function createSettingsPanel({ save, audio, applyQuality }) {
           <option value="low">低（流畅优先）</option>
         </select>
       </label>
+      <div class="row"><button id="set-tut">🔁 重看新手引导</button></div>
       <div class="row"><button id="set-ok">完成</button></div>
     </div>`;
   document.body.appendChild(root);
@@ -178,6 +179,10 @@ export function createSettingsPanel({ save, audio, applyQuality }) {
   q.value = s.quality || 'high';
   q.onchange = () => { save.setSetting('quality', q.value); applyQuality?.(q.value); };
 
+  root.querySelector('#set-tut').onclick = () => {
+    root.classList.add('hidden');
+    onReplayTutorial?.();
+  };
   root.querySelector('#set-ok').onclick = () => root.classList.add('hidden');
   return {
     root,
