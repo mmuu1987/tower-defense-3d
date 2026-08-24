@@ -21,6 +21,7 @@ import { Floaters } from './ui/floaters.js';
 import { createHud } from './ui/hud-lite.js';
 import { createMenu, createSelect, createSettingsPanel, createPause } from './ui/screens.js';
 import { createResult } from './ui/result.js';
+import { TouchGestures } from './engine/touch.js';
 
 const rep = installErrorReporting('td');
 const params = new URLSearchParams(location.search);
@@ -48,7 +49,10 @@ async function init() {
   }
 
   // ———— 引擎 ————
-  const renderer = createRenderer(QUALITY_PRESETS[save.data.settings.quality || 'high']);
+  // 触屏设备默认"中"画质（泛光+高清阴影对手机 GPU 偏重；用户手动选过则以存档为准）
+  const IS_COARSE = matchMedia('(pointer: coarse)').matches;
+  const quality0 = save.data.settings.quality || (IS_COARSE ? 'medium' : 'high');
+  const renderer = createRenderer(QUALITY_PRESETS[quality0]);
   renderer.domElement.id = 'gl';
   document.getElementById('app').appendChild(renderer.domElement);
 
@@ -63,7 +67,7 @@ async function init() {
 
   let sky = createSky(curTheme);
   scene.add(sky);
-  const preset0 = QUALITY_PRESETS[save.data.settings.quality || 'high'];
+  const preset0 = QUALITY_PRESETS[quality0];
   const { sun, hemi } = createSunLights(curTheme, preset0, GRID.w / 2, GRID.h / 2);
   scene.add(sun, hemi);
 
@@ -73,6 +77,7 @@ async function init() {
   });
   rig.cur.focus.set(-1.5, 0, 0.8);
   rig.dist = 17;
+  if (innerHeight > innerWidth) rig.dist = 24; // 竖屏（手机）：地图横向长，初始拉远看得更多
 
   const postfx = new PostFX(renderer, preset0);
   const fx = new FxLayer(scene);
@@ -239,7 +244,8 @@ async function init() {
 
     // 相机归位：清掉菜单环绕残留的偏航角，避免视角歪斜
     rig.yaw = 0; rig.cur.yaw = 0;
-    rig.dist = 17; rig.cur.dist = Math.min(rig.cur.dist, 24);
+    rig.dist = innerHeight > innerWidth ? 24 : 17; // 竖屏拉远，地图横向长
+    rig.cur.dist = Math.min(rig.cur.dist, Math.max(rig.dist, 24));
     rig.cur.focus.set(-1.5, 0, 0.8);
 
     battle = new Battle({
@@ -279,6 +285,7 @@ async function init() {
       audio,
       onSpeed: () => {},
       onQuit: () => { exitBattle(); showSelect(); },
+      onPause: () => togglePause(true),
     });
     chainAfterHud(w, l); // 在 HUD 钩子之后链式挂结算
 
@@ -363,10 +370,11 @@ async function init() {
   // ———— 输入 ————
   const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   const hitPoint = new THREE.Vector3();
-  renderer.domElement.addEventListener('pointerdown', (ev) => {
-    if (ev.button !== 0 || mode !== 'battle' || paused) return;
+  // 建造/选塔（鼠标点击与触摸轻点共用；触摸由 TouchGestures 判定轻点后回调）
+  function placeOrSelect(clientX, clientY) {
+    if (mode !== 'battle' || paused) return;
     if (!battle || battle.state === 'won' || battle.state === 'lost') return;
-    const ray = rig.screenRay(ev.clientX, ev.clientY);
+    const ray = rig.screenRay(clientX, clientY);
     if (!ray.ray.intersectPlane(groundPlane, hitPoint)) return;
     const cx = Math.floor(hitPoint.x + GRID.w / 2);
     const cz = Math.floor(hitPoint.z + GRID.h / 2);
@@ -378,6 +386,10 @@ async function init() {
     } else {
       battle.selectTower(battle.towerAt(cx, cz));
     }
+  }
+  renderer.domElement.addEventListener('pointerdown', (ev) => {
+    if (ev.button !== 0 || ev.pointerType === 'touch') return; // 触摸走手势层
+    placeOrSelect(ev.clientX, ev.clientY);
   });
   renderer.domElement.addEventListener('pointermove', (ev) => {
     if (mode !== 'battle' || !battle?.selectedType) return;
@@ -390,6 +402,11 @@ async function init() {
     setPreview({ x: cx - GRID.w / 2 + 0.5, z: cz - GRID.h / 2 + 0.5 }, range, ok ? 0x59d97a : 0xff5d5d);
   });
   renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  // 触摸手势：轻点=建造/选塔，单指拖=平移，双指=缩放/旋转
+  const touchGestures = new TouchGestures(renderer.domElement, rig, {
+    onTap: (x, y) => placeOrSelect(x, y),
+  }); // 调试锚点见文件末尾 __TD_DEBUG
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Escape') {
       if (settingsPanel.root.classList.contains('hidden') &&
@@ -495,6 +512,7 @@ async function init() {
 
   // ———— 启动模式 ————
   window.__TD_DEBUG = { renderer, scene, camera, postfx, rig, fx, floaters, audio, battle: () => battle,
+    touch: touchGestures,
     ui: { menu, selectScreen, pauseMenu, settingsPanel, resultModal } };
   Object.defineProperty(window, '__TD_SNAP', { value: () => battle ? battle.snapshot() : { mode } });
   window.__TD_SAVE = save;

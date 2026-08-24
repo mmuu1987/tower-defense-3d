@@ -1,5 +1,6 @@
 // M3 轻量 HUD：资源条 + 塔坞 + 波次控制 + 选中塔面板（M5 全面美化重做）
-export function createHud(battle, { audio, onSpeed, onQuit }) {
+const IS_TOUCH = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
+export function createHud(battle, { audio, onSpeed, onQuit, onPause }) {
   const root = document.createElement('div');
   root.id = 'hud';
   root.innerHTML = `
@@ -15,8 +16,10 @@ export function createHud(battle, { audio, onSpeed, onQuit }) {
       <button id="btn-wave" class="hidden">开始下一波</button>
       <button id="btn-speed">⏩ x1</button>
       <button id="btn-mute">🔊</button>
+      <button id="btn-pause" title="暂停">⏸</button>
       <button id="btn-quit">🏳️ 撤退</button>
     </div>
+    <div id="hud-cancel" class="hidden"><button id="btn-cancel">✕ 取消建造</button></div>
     <div id="hud-hint" class="hidden"></div>
   `;
   document.body.appendChild(root);
@@ -53,6 +56,8 @@ export function createHud(battle, { audio, onSpeed, onQuit }) {
       c.b.classList.toggle('sel', battle.selectedType === key);
       c.b.classList.toggle('poor', battle.gold < c.cost);
     }
+    // 建造模式显示取消芯片（触摸设备没有右键，必须有可见的退出途径）
+    root.querySelector('#hud-cancel').classList.toggle('hidden', !battle.selectedType);
   }
 
   function showPanel(t) {
@@ -109,7 +114,9 @@ export function createHud(battle, { audio, onSpeed, onQuit }) {
     onSelectChanged() {
       refreshDock();
       showPanel(battle.selectedTower);
-      api.hint(battle.selectedType ? '点击空地放置（右键取消）' : '');
+      api.hint(battle.selectedType
+        ? (IS_TOUCH ? '点空地放置 · 拖动可平移视角' : '点击空地放置（右键取消）')
+        : '');
     },
     end(win) {
       api.hint('');
@@ -136,6 +143,8 @@ export function createHud(battle, { audio, onSpeed, onQuit }) {
     audio.setMuted(m);
     e.currentTarget.textContent = m ? '🔇' : '🔊';
   };
+  $('#btn-pause').onclick = () => onPause?.();
+  root.querySelector('#btn-cancel').onclick = () => battle.selectBuild(null);
   $('#btn-quit').onclick = () => onQuit();
 
   api.setSpeedLabel = (m) => { btnSpeed.textContent = `⏩ x${m}`; };

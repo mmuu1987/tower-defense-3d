@@ -22,19 +22,30 @@ export class CameraRig {
     });
     window.addEventListener('pointermove', (e) => {
       if (!this.dragging) return;
-      const k = 0.0042 * this.cur.dist;
-      const f = this._horizForward(), r = this._right();
-      this._moveFocus(r * -(e.clientX - this.lastX) * k + f * (e.clientY - this.lastY) * k);
+      this.panByPixels(e.clientX - this.lastX, e.clientY - this.lastY);
       this.lastX = e.clientX; this.lastY = e.clientY;
     });
     window.addEventListener('pointerup', () => { this.dragging = false; });
     dom.addEventListener('wheel', (e) => {
       e.preventDefault();
-      this.dist = THREE.MathUtils.clamp(this.dist * Math.exp(e.deltaY * 0.0012), 9, 38);
+      this.zoomBy(Math.exp(e.deltaY * 0.0012));
     }, { passive: false });
     window.addEventListener('keydown', (e) => this.keys.add(e.code));
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));
     window.addEventListener('blur', () => this.keys.clear());
+  }
+
+  // ———— 手势/程序化驱动接口（触摸层与中键拖拽共用）————
+  panByPixels(dx, dy) {
+    const k = 0.0042 * this.cur.dist;
+    this._moveFocus(this._right().multiplyScalar(-dx * k)
+      .add(this._horizForward().multiplyScalar(dy * k)));
+  }
+  zoomBy(factor) {
+    this.dist = THREE.MathUtils.clamp(this.dist * factor, 9, 38);
+  }
+  rotateBy(delta) {
+    this.cur.yaw += delta;
   }
 
   _horizForward() {
