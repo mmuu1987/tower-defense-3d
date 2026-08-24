@@ -10,7 +10,7 @@ const PRELOAD = [
   'rock_large_b', 'stone_big', 'stone_big2', 'stone_small', 'snow_rocks', 'snow_tree',
   'flower_red', 'flower_yellow', 'flower_purple',
   'bush_detailed', 'grass_leafs', 'mushroom_red',
-  'stump_old', 'log', 'crystal_large', 'path_stone',
+  'stump_old', 'log', 'crystal_large',
   'weapon_ballista', 'weapon_cannon', 'weapon_turret', 'tower_crystals',
   'ruin_obelisk', 'ruin_column', 'ruin_ring', 'campfire_stones', 'campfire_logs',
   'cactus_short', 'cactus_tall',
@@ -49,11 +49,33 @@ export function scatterDecor({ theme, pathCells, seed = 12345, pathPts = null })
 
   const halfW = GRID.w / 2 - 0.4, halfH = GRID.h / 2 - 0.4;
   const placed = [];
+  // 路径距离场：装饰中心到路径中心线的最近距离（与 terrain 的路面丝带同源数学）
+  // 路肩半宽 0.775 + 模型冠幅/底座摆幅余量 ⇒ 任何摆设都不压路
+  const CLEARANCE = 1.12;
+  const dToPath = pathPts && pathPts.length > 1 ? (() => {
+    const segs = [];
+    for (let i = 0; i < pathPts.length - 1; i++) {
+      const a = pathPts[i], b = pathPts[i + 1];
+      const dx = b.x - a.x, dz = b.z - a.z;
+      const len = Math.hypot(dx, dz) || 1;
+      segs.push({ ax: a.x, az: a.z, dx: dx / len, dz: dz / len, len });
+    }
+    return (wx, wz) => {
+      let best = Infinity;
+      for (const s of segs) {
+        const t = Math.max(0, Math.min(s.len, (wx - s.ax) * s.dx + (wz - s.az) * s.dz));
+        const dd = Math.hypot(wx - (s.ax + s.dx * t), wz - (s.az + s.dz * t));
+        if (dd < best) best = dd;
+      }
+      return best;
+    };
+  })() : null;
   const findSpot = () => {
     for (let tries = 0; tries < 40; tries++) {
       const x = (rng() * 2 - 1) * halfW;
       const z = (rng() * 2 - 1) * halfH;
       if (isPathCell(pathCells, x, z)) continue;
+      if (dToPath && dToPath(x, z) < CLEARANCE) continue; // 严格净距：不进路肩、不压路面
       let ok = true;
       for (const p of placed) {
         if ((p.x - x) ** 2 + (p.z - z) ** 2 < 1.35) { ok = false; break; }
@@ -289,25 +311,8 @@ export function scatterDecor({ theme, pathCells, seed = 12345, pathPts = null })
     if (name === 'emberGlow') animated.push({ mat: mats.emberGlow, base: 2.4, speed: 3.2, phase: rng() * 6.28 });
   }
 
-  // —— 路缘石：沿路径两侧点缀（模型可用时）——
-  if (pathPts && pathPts.length > 2 && hasModel('path_stone')) {
-    for (let i = 0; i < pathPts.length - 1; i++) {
-      const a = pathPts[i], b = pathPts[i + 1];
-      const len = Math.hypot(b.x - a.x, b.z - a.z);
-      const nx = -(b.z - a.z) / len, nz = (b.x - a.x) / len; // 左法线
-      const steps = Math.max(1, Math.round(len / 2.1));
-      for (let s = 0; s < steps; s++) {
-        if (rng() < 0.5) continue; // 稀疏自然
-        const t = (s + 0.5) / steps;
-        const side = rng() < 0.5 ? 1 : -1;
-        const off = 0.62 + rng() * 0.18;
-        const x = a.x + (b.x - a.x) * t + nx * off * side;
-        const z = a.z + (b.z - a.z) * t + nz * off * side;
-        if (isPathCell(pathCells, x, z)) continue;
-        modelQueue.push({ name: 'path_stone', x, z, h: 0.11 + rng() * 0.06, ry: rng() * 6.283, mul: 1 });
-      }
-    }
-  }
+  // （路缘石已移除：path_stone 原本摆在 0.62~0.8 偏移处，正好压在路肩上，
+  //   用户反馈"路上别有其他东西"——路面只保留 terrain 自带的碎石纹理）
 
   // —— 实例化模型队列（Kenney glTF；加载失败的项目已被 tryModel 过滤）——
   for (const q of modelQueue) {
