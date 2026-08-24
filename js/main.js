@@ -39,6 +39,7 @@ function fatal(err) {
 
 async function init() {
   save.load();
+  if (params.get('admin') === '1') save.setAdmin(true); // ?admin=1 直开管理员模式
   let worldIdx = 0, lvlIdx = 0;
   if (params.get('level')) {
     const [w, l] = params.get('level').split(',').map(Number);

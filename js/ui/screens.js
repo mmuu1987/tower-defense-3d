@@ -34,10 +34,26 @@ export function createSelect({ save, onStart, onBack, onSettings }) {
         <button id="s-back">← 返回</button>
         <h2>选择关卡</h2>
         <span id="s-stars">⭐ 0/120</span>
+        <button id="s-admin" title="管理员">🛠</button>
         <button id="s-settings">⚙</button>
       </div>
       <div id="s-tabs"></div>
       <div id="s-grid"></div>
+    </div>
+    <div id="panel-admin" class="modal hidden">
+      <div class="modal-box">
+        <h3>🛠 管理员</h3>
+        <div class="row">
+          <button id="ad-unlock">🔓 解锁全部关卡</button>
+          <button id="ad-relock">🔒 恢复正常锁定</button>
+        </div>
+        <label style="margin-bottom:4px">任意跳转（无视锁定直接开战）</label>
+        <div id="ad-grid"></div>
+        <div class="row">
+          <button id="ad-reset">🗑 清空进度</button>
+          <button id="ad-close">关闭</button>
+        </div>
+      </div>
     </div>`;
   document.body.appendChild(root);
   let curWorld = 0;
@@ -77,6 +93,44 @@ export function createSelect({ save, onStart, onBack, onSettings }) {
   function render() { renderTabs(); renderGrid(); }
   root.querySelector('#s-back').onclick = onBack;
   root.querySelector('#s-settings').onclick = onSettings;
+
+  // ———— 管理员面板：全解锁 / 任意跳转 / 清空进度 ————
+  const adminPanel = root.querySelector('#panel-admin');
+  const adminBtn = root.querySelector('#s-admin');
+  const WORLD_ABBR = ['翠谷', '熔岩', '霜寒', '黄沙'];
+  function refreshAdminBtn() {
+    adminBtn.textContent = save.isAdmin() ? '🛠✓' : '🛠';
+    adminBtn.title = save.isAdmin() ? '管理员模式：已解锁全部（点击管理）' : '管理员';
+    adminBtn.classList.toggle('admin-on', save.isAdmin());
+  }
+  function buildAdminGrid() {
+    const grid = root.querySelector('#ad-grid');
+    grid.innerHTML = '';
+    for (let w = 0; w < 4; w++) {
+      const row = document.createElement('div');
+      row.className = 'ad-row';
+      row.innerHTML = `<b>${WORLD_ABBR[w]}</b>`;
+      for (let l = 0; l < 10; l++) {
+        const b = document.createElement('button');
+        b.className = 'lv';
+        b.textContent = `${w + 1}-${l + 1}`;
+        const cleared = save.getStars(w, l);
+        if (cleared) b.classList.add('done');
+        b.onclick = () => { adminPanel.classList.add('hidden'); onStart(w, l); };
+        row.appendChild(b);
+      }
+      grid.appendChild(row);
+    }
+  }
+  adminBtn.onclick = () => { buildAdminGrid(); adminPanel.classList.remove('hidden'); };
+  root.querySelector('#ad-close').onclick = () => adminPanel.classList.add('hidden');
+  root.querySelector('#ad-unlock').onclick = () => { save.setAdmin(true); refreshAdminBtn(); render(); };
+  root.querySelector('#ad-relock').onclick = () => { save.setAdmin(false); refreshAdminBtn(); render(); };
+  root.querySelector('#ad-reset').onclick = () => {
+    if (confirm('确定清空全部进度（星级/解锁）？此操作不可撤销。')) { save.clearProgress(); render(); buildAdminGrid(); }
+  };
+  refreshAdminBtn();
+
   render();
 
   return {

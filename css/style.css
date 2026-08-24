@@ -105,6 +105,12 @@ canvas{ display:block; }
 .sel-head button{ background:#1a2537; color:#e8eefc; border:1px solid #ffffff2a;
   border-radius:8px; padding:7px 14px; cursor:pointer; }
 #s-tabs{ display:flex; gap:8px; margin:16px 0 14px; }
+#s-admin.admin-on{ background:#3a2d10; border-color:#ffb34799; color:#ffd58a; }
+#ad-grid{ display:flex; flex-direction:column; gap:6px; margin:8px 0 2px; }
+.ad-row{ display:flex; align-items:center; gap:6px; }
+.ad-row b{ width:44px; font-size:12.5px; color:#9fb4d8; font-weight:600; flex:none; }
+.ad-row .lv{ flex:1; padding:7px 0 !important; font-size:13px !important; border-radius:8px; }
+.ad-row .lv.done{ background:#14301f; border-color:#59d97a55; color:#a8e6b8; }
 #s-tabs .tab{ flex:1; padding:10px 0; border-radius:10px; border:1px solid #ffffff22;
   background:#141d30; color:#cdd8ec; cursor:pointer; font-size:15px; }
 #s-tabs .tab.on{ background:#1d3a5f; border-color:#57a9ff88; color:#fff; font-weight:700; }
