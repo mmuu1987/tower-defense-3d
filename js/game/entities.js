@@ -294,8 +294,9 @@ export class Tower {
   upgradeCost() { return this.canUpgrade() ? this.def.lvls[this.level + 1].cost : 0; }
   upgrade() {
     if (!this.canUpgrade()) return false;
+    const cost = this.upgradeCost(); // 必须在 level++ 前取：++ 后查到的是下一级的钱（曾致卖价错账）
     this.level++;
-    this.invested += this.upgradeCost();
+    this.invested += cost;
     this.stats = statsFor(this.key, this.level);
     // 加一格等级指示
     const pip = this.mesh.userData.pips.children[0];
@@ -425,6 +426,17 @@ export class Tower {
 
   dispose(scene) {
     this.mesh.userData.disposed = true; // 阻止异步模型替换
+    // 释放每实例材质（共享材质在 towers.js 标记 userData.shared 跳过；
+    // 几何全部来自 geoCache 共享缓存，一律不释放。与 Enemy.dispose 的材质释放对称）
+    this.mesh.traverse((o) => {
+      if (!o.isMesh || !o.material) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      for (const m of mats) {
+        if (!m || m.userData?.shared || m.userData?.disposed) continue;
+        m.userData.disposed = true;
+        m.dispose();
+      }
+    });
     scene.remove(this.mesh);
   }
 }

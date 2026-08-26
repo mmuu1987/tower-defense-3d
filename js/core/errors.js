@@ -1,7 +1,12 @@
 // 全局错误捕获与上报：写入本地服务器 logs/client.log，支持远程诊断（GET /api/logs）
 export function installErrorReporting(tag = 'td') {
+  const _lastPost = {}; // 同类消息（前 60 字符）2 秒内只上报一次，防每帧错误刷爆日志
   const post = (msg) => {
     try {
+      const key = String(msg).slice(0, 60);
+      const n = performance.now();
+      if (n - (_lastPost[key] || 0) < 2000) return;
+      _lastPost[key] = n;
       fetch('/api/log', { method: 'POST', body: String(msg).slice(0, 2000) }).catch(() => {});
     } catch {}
   };

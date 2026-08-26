@@ -219,7 +219,7 @@ export async function buildTerrain({ theme, map }) {
       for (const [x, z] of spots) {
         if (Math.random() < 0.08) continue;
         const inst = _m('border_cliff', 1.25 + Math.random() * 0.7);
-        if (!inst) break;
+        if (!inst) continue; // 单点失败跳过该位置（break 会中断整圈围边）
         inst.position.set(x, -0.45, z);
         inst.rotation.y = Math.floor(Math.random() * 4) * (Math.PI / 2) + (Math.random() - 0.5) * 0.3;
         group.add(inst);

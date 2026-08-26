@@ -58,11 +58,13 @@ export function statsFor(key, level) {
 const geoCache = new Map();
 function G(name, make) { if (!geoCache.has(name)) geoCache.set(name, make()); return geoCache.get(name); }
 const mat = (o) => new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0.05, flatShading: true, ...o });
+// 共享材质标记：Tower.dispose 释放每实例材质时跳过它们（几何全部来自 geoCache，一律不释放）
+const sharedMat = (o) => { const m = mat(o); m.userData.shared = true; return m; };
 
 const BASE_MATS = {
-  stone: mat({ color: 0x8a8f98 }),
-  dark: mat({ color: 0x3a3f47 }),
-  wood: mat({ color: 0x7a5a34 }),
+  stone: sharedMat({ color: 0x8a8f98 }),
+  dark: sharedMat({ color: 0x3a3f47 }),
+  wood: sharedMat({ color: 0x7a5a34 }),
 };
 
 function basePlatform() {
