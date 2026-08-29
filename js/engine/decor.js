@@ -1,4 +1,4 @@
-// 程序化装饰 + Kenney CC0 模型集成：模型可用则用模型，否则回退程序化几何
+// 程序化装饰 + Kenney CC0 模型集成：聚类微生态、遗迹营地与模型回退几何
 import * as THREE from 'three';
 import { GRID } from '../game/config.js';
 import { isPathCell } from './terrain.js';
@@ -52,9 +52,8 @@ export function scatterDecor({ theme, pathCells, seed = 12345, pathPts = null })
 
   const halfW = GRID.w / 2 - 0.4, halfH = GRID.h / 2 - 0.4;
   const placed = [];
-  // 路径距离场：装饰中心到路径中心线的最近距离（与 terrain 的路面丝带同源数学）
-  // 路肩半宽 0.775 + 模型冠幅/底座摆幅余量 ⇒ 任何摆设都不压路
   const CLEARANCE = 1.12;
+
   const dToPath = pathPts && pathPts.length > 1 ? (() => {
     const segs = [];
     for (let i = 0; i < pathPts.length - 1; i++) {
@@ -73,12 +72,13 @@ export function scatterDecor({ theme, pathCells, seed = 12345, pathPts = null })
       return best;
     };
   })() : null;
+
   const findSpot = () => {
     for (let tries = 0; tries < 40; tries++) {
       const x = (rng() * 2 - 1) * halfW;
       const z = (rng() * 2 - 1) * halfH;
       if (isPathCell(pathCells, x, z)) continue;
-      if (dToPath && dToPath(x, z) < CLEARANCE) continue; // 严格净距：不进路肩、不压路面
+      if (dToPath && dToPath(x, z) < CLEARANCE) continue;
       let ok = true;
       for (const p of placed) {
         if ((p.x - x) ** 2 + (p.z - z) ** 2 < 1.35) { ok = false; break; }
@@ -90,7 +90,7 @@ export function scatterDecor({ theme, pathCells, seed = 12345, pathPts = null })
     return null;
   };
 
-  const kinds = theme.decor;
+  const kinds = theme.decor || [];
   const counts = {
     tree: 12, rock: 6, flower: 24,
     deadTree: 8, rockDark: 10, emberRock: 8, lavaPool: 6,
@@ -100,7 +100,7 @@ export function scatterDecor({ theme, pathCells, seed = 12345, pathPts = null })
     cactus: 10,
     tombstone: 8, crypt: 4, deadPine: 6, lantern: 4, spookyFence: 5, altar: 2, ghostStatue: 3,
   };
-  // 模型实例队列：{name,x,z,h,ry,mul,mats?}
+
   const modelQueue = [];
   const tryModel = (names, x, z, hBase, hVar, extraMul = 1, pulse = false) => {
     for (const nm of names) {
@@ -112,7 +112,6 @@ export function scatterDecor({ theme, pathCells, seed = 12345, pathPts = null })
     return false;
   };
 
-  // 聚类生成器：在主景物周围半径 0.35~0.8m 内聚类摆放副景物（树林灌木、岩石碎砾、墓群）
   const spawnCompanion = (cx, cz, distMin, distMax) => {
     const angle = rng() * Math.PI * 2;
     const r = distMin + rng() * (distMax - distMin);
@@ -130,7 +129,6 @@ export function scatterDecor({ theme, pathCells, seed = 12345, pathPts = null })
       const { x, z } = spot;
       switch (kind) {
         case 'tree': {
-          // 密林群落：主树 + 伴生小树 + 灌木丛 + 蘑菇/落木
           tryModel(['tree_oak', 'tree_default', 'tree_pine_tall'], x, z, 1.6, 0.5);
           const c1 = spawnCompanion(x, z, 0.45, 0.85);
           if (c1) tryModel(['bush_detailed', 'bush_large'], c1.x, c1.z, 0.45, 0.3);
@@ -141,7 +139,6 @@ export function scatterDecor({ theme, pathCells, seed = 12345, pathPts = null })
           break;
         }
         case 'pine': {
-          // 冰原冷杉群：高冷杉 + 伴生矮松 + 雪石簇 + 冰晶
           tryModel(['snow_tree', 'tree_pine_tall'], x, z, 1.5, 0.5);
           const c1 = spawnCompanion(x, z, 0.45, 0.8);
           if (c1) tryModel(['snow_rocks', 'stone_small'], c1.x, c1.z, 0.4, 0.3);
@@ -152,7 +149,6 @@ export function scatterDecor({ theme, pathCells, seed = 12345, pathPts = null })
         case 'rock':
         case 'rockDark':
         case 'snowRock': {
-          // 岩石群落：主巨石 + 伴生碎石 + 荒草
           const mainRock = kind === 'snowRock' ? 'snow_rocks' : (kind === 'rockDark' ? 'stone_big' : 'stone_big');
           tryModel([mainRock], x, z, 0.45, 0.3);
           const c1 = spawnCompanion(x, z, 0.35, 0.7);
@@ -162,7 +158,6 @@ export function scatterDecor({ theme, pathCells, seed = 12345, pathPts = null })
           break;
         }
         case 'tombstone': {
-          // 墓地庭院：双子墓碑 + 枯松 + 铁栅栏 + 发光灯柱
           tryModel(['grave_cross', 'grave_decorative', 'grave_round'], x, z, 0.6, 0.3);
           const c1 = spawnCompanion(x, z, 0.4, 0.75);
           if (c1) tryModel(['grave_round', 'grave_cross'], c1.x, c1.z, 0.45, 0.25);
@@ -171,21 +166,18 @@ export function scatterDecor({ theme, pathCells, seed = 12345, pathPts = null })
           break;
         }
         case 'crypt': {
-          // 地穴遗迹：石质墓室 + 铁栅栏 + 祭坛
           tryModel(['crypt_stone', 'crypt_small', 'coffin_old'], x, z, 0.95, 0.3);
           const c1 = spawnCompanion(x, z, 0.6, 1.0);
           if (c1) tryModel(['fence_iron', 'lantern_post'], c1.x, c1.z, 0.6, 0.2, 1, true);
           break;
         }
         case 'ruin': {
-          // 远古遗迹：主石柱 + 倒塌断柱 + 瓦砾桶
           tryModel(['ruin_obelisk', 'ruin_ring', 'ruin_column'], x, z, 1.1, 0.4);
           const c1 = spawnCompanion(x, z, 0.5, 0.9);
           if (c1) tryModel(['ruin_column', 'barrel'], c1.x, c1.z, 0.55, 0.3);
           break;
         }
         case 'cactus': {
-          // 荒漠仙人掌群：高仙人掌 + 矮仙人掌 + 枯木 + 荒漠巨石
           tryModel(['cactus_tall'], x, z, 0.95, 0.4);
           const c1 = spawnCompanion(x, z, 0.4, 0.75);
           if (c1) tryModel(['cactus_short'], c1.x, c1.z, 0.5, 0.3);
@@ -194,7 +186,6 @@ export function scatterDecor({ theme, pathCells, seed = 12345, pathPts = null })
           break;
         }
         case 'campfire': {
-          // 营地：篝火 + 木柴 + 探险桶
           if (hasModel('campfire_stones')) {
             modelQueue.push({ name: 'campfire_stones', x, z, h: 0.35 + rng() * 0.08, ry: rng() * 6.283, mul: 1 });
             modelQueue.push({ name: 'campfire_logs', x, z, h: 0.45 + rng() * 0.1, ry: rng() * 6.283, mul: 1 });
@@ -232,6 +223,40 @@ export function scatterDecor({ theme, pathCells, seed = 12345, pathPts = null })
         case 'lavaPool': {
           const r = 0.35 + rng() * 0.35;
           add('lavaPool', null, null, { x, y: 0.021, z, ry: 0, sx: r, sy: 1, sz: r });
+          break;
+        }
+        case 'flower': {
+          if (tryModel([pickOne(rng, ['flower_red', 'flower_yellow', 'flower_purple'])], x, z, 0.26, 0.35)) break;
+          put('stem', x, 0.16, z, 0, 1, 1, 1);
+          put('bloom', x, 0.34, z, rng() * 6.28, 1, 1, 1);
+          break;
+        }
+        case 'deadTree': {
+          if (tryModel(['stump_old', 'log'], x, z, 0.7, 0.5)) break;
+          const h = 1.1 + rng() * 0.8;
+          put('deadTrunk', x, h * 0.5, z, rng() * 6.28, 1.4, h, 1.4);
+          put('branch', x, h * 0.85, z, rng() * 6.28, 1.3, 1.1, 1.3);
+          break;
+        }
+        case 'bush': {
+          tryModel(['bush_detailed'], x, z, 0.5, 0.45);
+          break;
+        }
+        case 'tuft': {
+          tryModel(['grass_leafs'], x, z, 0.3, 0.4);
+          break;
+        }
+        case 'mushroom': {
+          tryModel(['mushroom_red'], x, z, 0.3, 0.35);
+          break;
+        }
+        case 'iceStatue': {
+          if (hasModel('ruin_ring')) {
+            modelQueue.push({
+              name: pickOne(rng, ['ruin_ring', 'ruin_column']),
+              x, z, h: 0.8 + rng() * 0.5, ry: rng() * 6.283, mul: 1, icyTint: true,
+            });
+          }
           break;
         }
       }
@@ -279,11 +304,10 @@ export function scatterDecor({ theme, pathCells, seed = 12345, pathPts = null })
     lavaPool: new THREE.CircleGeometry(1, 22),
   };
 
-  // 分支的偏转姿态
   const branchTilt = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.7, 0, 0.5));
 
   for (const [name, def] of Object.entries(parts)) {
-    if (!def.list.length) continue;
+    if (!def.list.length || !geoms[name] || !mats[name]) continue;
     const im = new THREE.InstancedMesh(geoms[name], mats[name], def.list.length);
     im.castShadow = name !== 'lavaPool' && name !== 'bloom' && name !== 'emberGlow';
     im.receiveShadow = false;
@@ -311,10 +335,6 @@ export function scatterDecor({ theme, pathCells, seed = 12345, pathPts = null })
     if (name === 'emberGlow') animated.push({ mat: mats.emberGlow, base: 2.4, speed: 3.2, phase: rng() * 6.28 });
   }
 
-  // （路缘石已移除：path_stone 原本摆在 0.62~0.8 偏移处，正好压在路肩上，
-  //   用户反馈"路上别有其他东西"——路面只保留 terrain 自带的碎石纹理）
-
-  // —— 实例化模型队列（Kenney glTF；加载失败的项目已被 tryModel 过滤）——
   for (const q of modelQueue) {
     const inst = q.pulse
       ? makeInstanceWithMaterials(q.name, q.h, q.mul)
@@ -329,15 +349,15 @@ export function scatterDecor({ theme, pathCells, seed = 12345, pathPts = null })
       });
     }
     if (q.pulse) {
-      const mats = [];
+      const pMats = [];
       inst.traverse((m) => {
         if (m.isMesh && m.material) {
           (Array.isArray(m.material) ? m.material : [m.material]).forEach((mm) => {
-            if (mm.emissive) { mm.emissive.setHex(0x59c8ff); mats.push(mm); }
+            if (mm.emissive) { mm.emissive.setHex(0x59c8ff); pMats.push(mm); }
           });
         }
       });
-      for (const mm of mats) {
+      for (const mm of pMats) {
         animated.push({ mat: mm, base: 1.1, speed: 1.7, phase: rng() * 6.28 });
       }
     }
@@ -352,3 +372,4 @@ export function scatterDecor({ theme, pathCells, seed = 12345, pathPts = null })
     },
   };
 }
+
