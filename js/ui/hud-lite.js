@@ -86,14 +86,16 @@ export function createHud(battle, { audio, onSpeed, onQuit, onPause }) {
   function showPanel(t) {
     if (!t) { panel.classList.add('hidden'); return; }
     const s = t.stats;
-    const dps = (s.dmg * s.rate * (s.chains ? (1 + (s.chains - 1) * 0.5) : 1)).toFixed(0);
+    const isMax = !t.canUpgrade();
+    const lvTag = isMax ? '<span class="lv max-tag">Lv.5 👑MAX</span>' : `<span class="lv">Lv.${t.level + 1}</span>`;
+    const extraStat = s.slow ? ` · 减速 ${(s.slow.pct * 100).toFixed(0)}%` : (s.chains ? ` · 连锁 ${s.chains}体` : (s.splash ? ` · 溅射 ${s.splash.toFixed(1)}` : (s.pierce ? ' · 穿甲' : '')));
     panel.classList.remove('hidden');
     panel.innerHTML = `
-      <b>${t.def.name} <span class="lv">Lv.${t.level + 1}</span></b>
-      <div class="stats">伤害 ${s.dmg} · 射速 ${s.rate.toFixed(2)}/s · 射程 ${s.range.toFixed(1)}</div>
+      <b>${t.def.name} ${lvTag}</b>
+      <div class="stats">伤害 ${s.dmg} · 射速 ${s.rate.toFixed(2)}/s · 射程 ${s.range.toFixed(1)}${extraStat}</div>
       <div class="row">
-        ${t.canUpgrade() ? `<button id="p-up">升级 ${t.upgradeCost()}</button>` : '<span class="max">已满级</span>'}
-        <button id="p-sell">出售 ${t.sellValue()}</button>
+        ${t.canUpgrade() ? `<button id="p-up">升级 Lv.${t.level + 2} (${t.upgradeCost()}💰)</button>` : '<span class="max">已达最高级 👑</span>'}
+        <button id="p-sell">出售 ${t.sellValue()}💰</button>
       </div>`;
     const up = panel.querySelector('#p-up');
     const sell = panel.querySelector('#p-sell');

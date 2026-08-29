@@ -290,7 +290,7 @@ export class Tower {
   }
   placeAt(pos) { this.pos.copy(pos); this.mesh.position.copy(pos); }
 
-  canUpgrade() { return this.level < 2; }
+  canUpgrade() { return this.level < (this.def.lvls ? this.def.lvls.length - 1 : 4); }
   upgradeCost() { return this.canUpgrade() ? this.def.lvls[this.level + 1].cost : 0; }
   upgrade() {
     if (!this.canUpgrade()) return false;
@@ -298,15 +298,24 @@ export class Tower {
     this.level++;
     this.invested += cost;
     this.stats = statsFor(this.key, this.level);
-    // 加一格等级指示
-    const pip = this.mesh.userData.pips.children[0];
-    if (pip) {
+    // 加等级指示
+    const pipsGroup = this.mesh.userData.pips;
+    if (pipsGroup) {
+      pipsGroup.clear();
       const n = this.level + 1;
-      this.mesh.userData.pips.clear();
+      const isMax = !this.canUpgrade();
+      const pipGeo = new THREE.BoxGeometry(0.065, isMax ? 0.08 : 0.05, 0.065);
+      const pipMat = new THREE.MeshStandardMaterial({
+        color: isMax ? 0xffe044 : (this.level >= 3 ? 0x66ddff : 0xffcc55),
+        emissive: isMax ? 0xffaa00 : (this.level >= 3 ? 0x0088cc : 0xaa7700),
+        emissiveIntensity: isMax ? 1.3 : 0.6,
+        roughness: 0.3,
+        metalness: 0.4,
+      });
       for (let i = 0; i < n; i++) {
-        const c = pip.clone();
-        c.position.set((i - (n - 1) / 2) * 0.14, 0, 0.5);
-        this.mesh.userData.pips.add(c);
+        const c = new THREE.Mesh(pipGeo, pipMat);
+        c.position.set((i - (n - 1) / 2) * 0.11, 0, 0.5);
+        pipsGroup.add(c);
       }
     }
     return true;

@@ -41,12 +41,13 @@ canvas{ display:block; }
   background:#101826e6; border:1px solid #ffffff2a; border-radius:12px; padding:12px 14px;
   font-size:13.5px; line-height:1.5; }
 #hud-panel .lv{ color:var(--warn); font-size:12px; margin-left:4px; }
+#hud-panel .lv.max-tag{ color:#ffe044; text-shadow:0 0 6px #ffbb0088; font-weight:bold; }
 #hud-panel .stats{ color:var(--dim); margin:4px 0 8px; }
 #hud-panel .row{ display:flex; gap:8px; }
 #hud-panel button{ flex:1; background:#22304a; color:#fff; border:1px solid #ffffff33;
   border-radius:8px; padding:6px 0; font-size:13px; }
 #hud-panel button:hover{ background:#2c3f61; }
-#hud-panel .max{ color:var(--ok); align-self:center; }
+#hud-panel .max{ color:#ffd700; font-weight:600; font-size:12.5px; align-self:center; }
 #hud-actions{ position:absolute; right:14px; top:34px; display:flex; gap:8px; }
 #hud-actions button{ background:#141d30e6; color:#e8eefc; border:1px solid #ffffff2e;
   border-radius:9px; padding:7px 13px; font-size:14px; }
