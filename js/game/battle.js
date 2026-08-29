@@ -28,6 +28,8 @@ export class Battle {
     this.time = 0;
     this.kills = 0;
     this.leaks = 0;
+    this.waveHpMul = 1;      // 当前波 HP 爬坡乘数（关卡内越后的波次敌人越硬）
+    this.waveRewardMul = 1;  // 当前波赏金爬坡乘数
 
     this.selectedType = null;       // 待建造的塔类型
     this.selectedTower = null;
@@ -105,6 +107,10 @@ export class Battle {
     if (this.waveIdx + 1 >= this.level.waves.length) return;
     this.waveIdx++;
     const wave = this.level.waves[this.waveIdx];
+    // 关卡内波次爬坡：前两波免爬坡（配合开局数量折扣），第 3 波起敌人越后越硬，
+    // 对冲玩家经济滚雪球，掰正"开局难后期易"的难度倒挂
+    this.waveHpMul = 1 + Math.max(0, this.waveIdx - 1) * (this.level.waveHpRamp ?? 0);
+    this.waveRewardMul = 1 + Math.max(0, this.waveIdx - 1) * (this.level.waveRewardRamp ?? 0);
     this.spawnQueue = [];
     for (const g of wave.groups) {
       for (let i = 0; i < g.count; i++) {
@@ -119,6 +125,27 @@ export class Battle {
   get waveCleared() {
     return this.state === 'combat' && this.spawnQueue.length === 0 &&
       this.enemies.every((e) => !e.alive);
+  }
+
+  // ———— 提前开战：波间休整期跳过剩余倒计时，按剩余秒数返还奖励金 ————
+  // 设计意图：与波次 HP 爬坡配合——休整时间是"备战资源"，高手可拿它换经济，但要少几秒布阵窗口
+  earlyCallBonus(remainSec) {
+    const upcoming = this.waveIdx + 1;   // 即将开始的一波（0 基）
+    return Math.round(remainSec * (4 + upcoming * 1.0));
+  }
+
+  callWaveEarly() {
+    if (this.state !== 'intermission') return 0;
+    const remain = Math.max(0, this.intermission);
+    const bonus = remain > 0.05 ? this.earlyCallBonus(remain) : 0;
+    if (bonus > 0) {
+      this.gold += bonus;
+      this._lastEarlyBonus = bonus;
+      this.hooks.onGold?.(this.gold);
+      this.hooks.onEarlyCall?.(bonus, remain);
+    }
+    this.startWave();
+    return bonus;
   }
 
   // ———— 主更新（dt 已乘速度倍率）————
@@ -203,8 +230,8 @@ export class Battle {
     if (!def) return;
     const e = new Enemy(def, {
       sampler: this.sampler,
-      hpMul: this.level.hpMul,
-      rewardMul: this.level.rewardMul,
+      hpMul: this.level.hpMul * this.waveHpMul,
+      rewardMul: this.level.rewardMul * this.waveRewardMul,
       speedMul: this.level.speedMul,
     });
     this.sampler.at(0, e.pos);
@@ -229,8 +256,8 @@ export class Battle {
       for (let i = 0; i < si.count; i++) {
         const child = new Enemy(ALL_DEFS[si.type], {
           sampler: this.sampler,
-          hpMul: this.level.hpMul * si.hpMul,
-          rewardMul: this.level.rewardMul * (si.rewardMul ?? 0.5),
+          hpMul: this.level.hpMul * this.waveHpMul * si.hpMul,
+          rewardMul: this.level.rewardMul * this.waveRewardMul * (si.rewardMul ?? 0.5),
           speedMul: this.level.speedMul,
         });
         child.dist = Math.max(0, e.dist - i * 0.5);
@@ -247,8 +274,8 @@ export class Battle {
       for (let i = 0; i < ds.count; i++) {
         const child = new Enemy(ALL_DEFS[ds.type], {
           sampler: this.sampler,
-          hpMul: this.level.hpMul * ds.hpMul,
-          rewardMul: this.level.rewardMul * 0.5,
+          hpMul: this.level.hpMul * this.waveHpMul * ds.hpMul,
+          rewardMul: this.level.rewardMul * this.waveRewardMul * 0.5,
           speedMul: this.level.speedMul,
         });
         child.dist = Math.max(0, e.dist - i * 0.7);

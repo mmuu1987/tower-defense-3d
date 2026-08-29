@@ -1,5 +1,6 @@
 // M3 轻量 HUD：资源条 + 塔坞 + 波次控制 + 选中塔面板（M5 全面美化重做）
 const IS_TOUCH = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
+import { ENEMY_DEFS } from '../game/units.js';
 export function createHud(battle, { audio, onSpeed, onQuit, onPause }) {
   const root = document.createElement('div');
   root.id = 'hud';
@@ -10,6 +11,7 @@ export function createHud(battle, { audio, onSpeed, onQuit, onPause }) {
       <span id="hud-wave">波次 0/0</span>
       <span id="hud-state"></span>
     </div>
+    <div id="hud-next" class="hidden"></div>
     <div id="hud-dock"></div>
     <div id="hud-panel" class="hidden"></div>
     <div id="hud-actions">
@@ -28,10 +30,31 @@ export function createHud(battle, { audio, onSpeed, onQuit, onPause }) {
   const dock = $('#hud-dock');
   const panel = $('#hud-panel');
   const hint = $('#hud-hint');
+  const nextEl = $('#hud-next');
   const btnWave = $('#btn-wave');
-  // 建造阶段就要显示开波按钮（此前仅波间倒计时显示，导致开局找不到入口）
-  if (battle.state === 'build') btnWave.classList.remove('hidden');
   const btnSpeed = $('#btn-speed');
+
+  // ———— 下一波预览：敌人构成 + 飞行标记 + 波次强化倍率（让 HP 爬坡对玩家可见）————
+  function updateNextWave() {
+    if (battle.state === 'won' || battle.state === 'lost') { nextEl.classList.add('hidden'); return; }
+    const idx = battle.waveIdx + 1;                       // 下一波（0 基）
+    const waves = battle.level.waves;
+    if (idx >= waves.length) {
+      nextEl.classList.remove('hidden');
+      nextEl.innerHTML = '<b>⚡ 最终波</b> 守住！';
+      return;
+    }
+    const wv = waves[idx];
+    const parts = wv.groups.map((g) => {
+      const def = ENEMY_DEFS[g.type];
+      if (!def) return null;
+      return `${def.name}×${g.count}${def.fly ? '<span class="fly">🕊飞行</span>' : ''}`;
+    }).filter(Boolean);
+    const ramp = 1 + Math.max(0, idx - 1) * (battle.level.waveHpRamp ?? 0);
+    const rampTag = ramp > 1.001 ? ` <span class="ramp">⚔️×${ramp.toFixed(2)}</span>` : '';
+    nextEl.classList.remove('hidden');
+    nextEl.innerHTML = (wv.boss ? '<b>👑 BOSS 波</b> ' : '<b>下一波</b> ') + parts.join(' · ') + rampTag;
+  }
 
   // 塔坞
   const DOCK = [
@@ -92,11 +115,21 @@ export function createHud(battle, { audio, onSpeed, onQuit, onPause }) {
     wave(cur, total, boss) {
       $('#hud-wave').textContent = `波次 ${cur}/${total}` + (boss ? ' 👑BOSS' : '');
       if (boss) api.banner('👑 BOSS 来袭！');
+      btnWave.classList.add('hidden'); // 波已开打（无论手动/倒计时自动），收起开波按钮
+      btnWave.classList.remove('rush');
+      updateNextWave();
     },
     state(txt) { $('#hud-state').textContent = txt || ''; },
     intermission(sec) {
       btnWave.classList.remove('hidden');
-      btnWave.textContent = `下一波 (${sec.toFixed(0)}s)`;
+      const bonus = battle.earlyCallBonus(Math.max(0, sec));
+      if (sec > 0.15) {
+        btnWave.classList.add('rush');
+        btnWave.textContent = `⏩ 提前开战 +${bonus}💰 (${sec.toFixed(0)}s)`;
+      } else {
+        btnWave.classList.remove('rush');
+        btnWave.textContent = '下一波即将开始…';
+      }
     },
     hideWaveBtn() { btnWave.classList.add('hidden'); },
     hint(txt) {
@@ -129,7 +162,12 @@ export function createHud(battle, { audio, onSpeed, onQuit, onPause }) {
     },
   };
 
-  btnWave.onclick = () => { battle.startWave(); api.hideWaveBtn(); };
+  // 开波按钮：休整期=提前开战（拿奖励金）；建造期=正常开战
+  btnWave.onclick = () => {
+    if (battle.state === 'intermission') battle.callWaveEarly();
+    else battle.startWave();
+    api.hideWaveBtn();
+  };
   const speeds = [1, 2, 3];
   let spIdx = 0;
   btnSpeed.onclick = () => {
@@ -159,10 +197,17 @@ export function createHud(battle, { audio, onSpeed, onQuit, onPause }) {
   chain('onWave', (c, t, boss) => api.wave(c, t, boss));
   chain('onSelectChanged', () => api.onSelectChanged());
   chain('onWaveClear', (n) => api.banner(`第 ${n} 波清除！+${battle._lastBonus ?? 30}💰`));
+  chain('onIntermission', (sec) => api.intermission(sec));
+  chain('onEarlyCall', (bonus) => {
+    api.banner(`⏩ 提前开战 +${bonus}💰`);
+    audio?.coin();
+  });
   chain('onEnd', (r) => api.end(r.win));
 
   api.gold(battle.gold);
   api.lives(battle.lives);
   api.wave(0, battle.level.waves.length, false);
+  // 建造阶段就要显示开波按钮（此前仅波间倒计时显示，导致开局找不到入口）
+  if (battle.state === 'build') btnWave.classList.remove('hidden');
   return api;
 }

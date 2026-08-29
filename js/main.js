@@ -468,6 +468,20 @@ async function init() {
       battle.selectBuild(battle.selectedType === key ? null : key);
       audio.click();
     }
+    // 空格/回车：开波（休整期=提前开战拿奖励金；建造期=正常开战）
+    if (mode === 'battle' && battle && !paused && (e.code === 'Space' || e.code === 'Enter')
+        && settingsPanel.root.classList.contains('hidden')
+        && resultModal.root.classList.contains('hidden')) {
+      if (battle.state === 'intermission') {
+        e.preventDefault();
+        battle.callWaveEarly();
+        hud?.hideWaveBtn();
+      } else if (battle.state === 'build') {
+        e.preventDefault();
+        battle.startWave();
+        hud?.hideWaveBtn();
+      }
+    }
   });
 
   // ———— 自动化测试模式（与 tools/sim.mjs 同策略：严格建造优先，造不起才升级）————
