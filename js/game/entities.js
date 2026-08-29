@@ -143,6 +143,33 @@ export class Enemy {
 
   get progress() { return this.dist; }
 
+  /** 模型迟到热替换：启动时预载失败（超时/断网）的敌人以程序化替身出场（会走但四肢无动作），
+   *  模型加载完成后原地升级为动画模型——消除"没动作地滑行"整类问题的兜底。
+   *  注意：GLB 实例 group 自带归一化缩放，迁移时不得覆盖其 scale。 */
+  _tryModelUpgrade() {
+    if (this.mixer || this.dying || this.disposed) return false;
+    const m = this.def.model;
+    if (!m || !hasEnemyModel(m.name)) return false;
+    const inst = makeEnemyInstance(m.name, m.h, m.tint ?? null);
+    if (!inst) return false;
+    const old = this.mesh;
+    this.mesh = inst.group;
+    this.mixer = inst.mixer;
+    this.actions = inst.actions;
+    this.flashMats = inst.mats;
+    this.yawOff = m.yaw ?? 0;
+    this._modelBaseScale = null; // 重新基准化受击弹跳缩放
+    // 血条与位置迁移（血条是 old 的子节点，必须先摘下来）
+    if (this.bar) { old.remove(this.bar); this.mesh.add(this.bar); }
+    this.mesh.position.copy(old.position);
+    this.mesh.rotation.copy(old.rotation);
+    const parent = old.parent;
+    if (parent) { parent.add(this.mesh); parent.remove(old); }
+    // 程序化替身仅 skin 材质为实例私有（几何共享缓存，不释放）
+    old.userData.skin?.dispose();
+    return true;
+  }
+
   applySlow(pct, dur) {
     if (pct >= this.slowPct - 0.01 || this.slowT <= 0) { this.slowPct = pct; }
     this.slowT = Math.max(this.slowT, dur);
@@ -166,6 +193,14 @@ export class Enemy {
 
   update(dt, ctx) {
     this.age += dt;
+    // 模型迟到检测：程序化替身每 2s 查一次模型缓存，可用即热替换
+    if (!this.mixer && this.def.model) {
+      this._modelT = (this._modelT ?? 1) - dt;
+      if (this._modelT <= 0) {
+        this._modelT = 2;
+        this._tryModelUpgrade();
+      }
+    }
     // 减速计时
     if (this.slowT > 0) {
       this.slowT -= dt;

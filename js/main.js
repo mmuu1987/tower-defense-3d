@@ -16,7 +16,7 @@ import { Battle } from './game/battle.js';
 import { FxLayer, makePathSampler } from './game/entities.js';
 import { TOWER_DEFS } from './game/towers.js';
 import { ENEMY_MODEL_NAMES } from './game/units.js';
-import { preloadEnemyModels } from './engine/modellib.js';
+import { preloadEnemyModels, hasEnemyModel } from './engine/modellib.js';
 import { Floaters } from './ui/floaters.js';
 import { createHud } from './ui/hud-lite.js';
 import { createMenu, createSelect, createSettingsPanel, createPause } from './ui/screens.js';
@@ -101,6 +101,16 @@ async function init() {
     initDecorModels(),
     preloadEnemyModels(ENEMY_MODEL_NAMES), // 敌人动画模型预热
   ]); // Kenney 模型预热（失败自动回退程序化装饰）
+  // 敌人模型预载失败自愈：弱网/超时（soldier 2.1MB、xbot 2.9MB、brainstem 3.1MB）下补载，
+  // 加载完成后场上的程序化替身会由 Enemy._tryModelUpgrade 原地热替换为动画模型
+  (async () => {
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 15000));
+      const missing = ENEMY_MODEL_NAMES.filter((n) => !hasEnemyModel(n));
+      if (!missing.length) return;
+      try { await preloadEnemyModels(missing); } catch { /* 下轮再试 */ }
+    }
+  })();
   let worldBuild = null; // {group, pathCells, pts}
   async function rebuildWorld(theme, map) {
     if (worldBuild) {
