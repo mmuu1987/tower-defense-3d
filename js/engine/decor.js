@@ -92,186 +92,145 @@ export function scatterDecor({ theme, pathCells, seed = 12345, pathPts = null })
 
   const kinds = theme.decor;
   const counts = {
-    tree: 24, rock: 8, flower: 40,
-    deadTree: 14, rockDark: 14, emberRock: 10, lavaPool: 7,
-    pine: 22, crystal: 12, snowRock: 8,
-    bush: 9, tuft: 32, mushroom: 5,
-    ruin: 4, campfire: 3, iceStatue: 4,
-    cactus: 18,
-    tombstone: 18, crypt: 5, deadPine: 10, lantern: 4, spookyFence: 8, altar: 3, ghostStatue: 4,
+    tree: 12, rock: 6, flower: 24,
+    deadTree: 8, rockDark: 10, emberRock: 8, lavaPool: 6,
+    pine: 10, crystal: 8, snowRock: 6,
+    bush: 6, tuft: 18, mushroom: 4,
+    ruin: 3, campfire: 3, iceStatue: 3,
+    cactus: 10,
+    tombstone: 8, crypt: 4, deadPine: 6, lantern: 4, spookyFence: 5, altar: 2, ghostStatue: 3,
   };
   // 模型实例队列：{name,x,z,h,ry,mul,mats?}
   const modelQueue = [];
-  const tryModel = (names, x, z, hBase, hVar, extraMul = 1) => {
+  const tryModel = (names, x, z, hBase, hVar, extraMul = 1, pulse = false) => {
     for (const nm of names) {
       if (hasModel(nm)) {
-        modelQueue.push({ name: nm, x, z, h: hBase * (0.8 + rng() * hVar), ry: rng() * 6.283, mul: extraMul });
+        modelQueue.push({ name: nm, x, z, h: hBase * (0.85 + rng() * hVar), ry: rng() * 6.283, mul: extraMul, pulse });
         return true;
       }
     }
     return false;
   };
 
+  // 聚类生成器：在主景物周围半径 0.35~0.8m 内聚类摆放副景物（树林灌木、岩石碎砾、墓群）
+  const spawnCompanion = (cx, cz, distMin, distMax) => {
+    const angle = rng() * Math.PI * 2;
+    const r = distMin + rng() * (distMax - distMin);
+    const nx = cx + Math.cos(angle) * r;
+    const nz = cz + Math.sin(angle) * r;
+    if (dToPath && dToPath(nx, nz) < CLEARANCE) return null;
+    return { x: nx, z: nz };
+  };
+
   for (const kind of kinds) {
-    const n = counts[kind] || 8;
+    const n = counts[kind] || 6;
     for (let i = 0; i < n; i++) {
       const spot = findSpot();
       if (!spot) break;
       const { x, z } = spot;
       switch (kind) {
         case 'tree': {
-          if (tryModel(['tree_oak', 'tree_default', 'tree_pine_tall'], x, z, 1.5, 0.6)) break;
-          const h = 0.85 + rng() * 0.5;
-          put('trunk', x, h * 0.42, z, rng() * 6.28, 1, h / 0.9, 1);
-          put('leaf', x, h * 0.95, z, rng() * 6.28, 0.9 + rng() * 0.3, 0.95 + rng() * 0.3, 0.9 + rng() * 0.3);
-          put('leafTop', x, h * 1.55, z, rng() * 6.28, 0.62, 0.7, 0.62);
+          // 密林群落：主树 + 伴生小树 + 灌木丛 + 蘑菇/落木
+          tryModel(['tree_oak', 'tree_default', 'tree_pine_tall'], x, z, 1.6, 0.5);
+          const c1 = spawnCompanion(x, z, 0.45, 0.85);
+          if (c1) tryModel(['bush_detailed', 'bush_large'], c1.x, c1.z, 0.45, 0.3);
+          const c2 = spawnCompanion(x, z, 0.5, 0.95);
+          if (c2) tryModel(['stump_old', 'log', 'mushroom_red'], c2.x, c2.z, 0.35, 0.3);
+          const c3 = spawnCompanion(x, z, 0.4, 0.8);
+          if (c3) tryModel(['flower_yellow', 'flower_red', 'grass_leafs'], c3.x, c3.z, 0.25, 0.2);
           break;
         }
         case 'pine': {
-          if (tryModel(['snow_tree'], x, z, 1.4, 0.6)) break;
-          const h = 1.05 + rng() * 0.65;
-          put('trunk', x, h * 0.3, z, rng() * 6.28, 0.85, 0.7, 0.85);
-          put('pineLeaf', x, h * 0.92, z, rng() * 6.28, 0.78 + rng() * 0.25, h / 1.25, 0.78 + rng() * 0.25);
+          // 冰原冷杉群：高冷杉 + 伴生矮松 + 雪石簇 + 冰晶
+          tryModel(['snow_tree', 'tree_pine_tall'], x, z, 1.5, 0.5);
+          const c1 = spawnCompanion(x, z, 0.45, 0.8);
+          if (c1) tryModel(['snow_rocks', 'stone_small'], c1.x, c1.z, 0.4, 0.3);
+          const c2 = spawnCompanion(x, z, 0.5, 0.85);
+          if (c2) tryModel(['crystal_large'], c2.x, c2.z, 0.38, 0.3, 1, true);
           break;
         }
         case 'rock':
         case 'rockDark':
         case 'snowRock': {
-          // 熔岩世界：纯石克隆材质压暗（避免草皮顶穿帮火山主题）
-          if (kind === 'rockDark' && hasModel('stone_big')) {
-            const inst = makeInstanceWithMaterials('stone_big', 0.34 + rng() * 0.25);
-            if (inst) {
-              inst.position.set(x, 0, z);
-              inst.rotation.y = rng() * 6.283;
-              inst.traverse((m) => {
-                if (m.isMesh && m.material && !Array.isArray(m.material) && m.color) m.color.multiplyScalar(0.32);
-              });
-              group.add(inst);
-              break;
-            }
-          }
-          // 随机选石种+随机尺寸，避免清一色巨石
-          const mpick = kind === 'rock'
-            ? pickOne(rng, [['stone_big', 0.26], ['stone_big2', 0.24], ['stone_small', 0.15], ['stone_small', 0.12]])
-            : kind === 'snowRock' ? ['snow_rocks', 0.55] : ['stone_big', 0.26];
-          const mh = typeof mpick[1] === 'number' ? mpick[1] : 0.55;
-          if (hasModel(mpick[0])) {
-            modelQueue.push({ name: mpick[0], x, z, h: mh * (0.75 + rng() * 0.5), ry: rng() * 6.283, mul: 1 });
-            break;
-          }
-          const s = 0.5 + rng() * 0.75;
-          put(kind === 'rock' ? 'rock' : kind === 'rockDark' ? 'rockDark' : 'snowRock',
-            x, s * 0.22, z, rng() * 6.28, s, s * (0.55 + rng() * 0.3), s);
-          break;
-        }
-        case 'flower': {
-          if (tryModel([pickOne(rng, ['flower_red', 'flower_yellow', 'flower_purple'])], x, z, 0.26, 0.35)) break;
-          put('stem', x, 0.16, z, 0, 1, 1, 1);
-          put('bloom', x, 0.34, z, rng() * 6.28, 1, 1, 1);
-          break;
-        }
-        case 'crystal': {
-          if (hasModel('crystal_large')) {
-            modelQueue.push({ name: 'crystal_large', x, z, h: 0.55 + rng() * 0.45, ry: rng() * 6.283, mul: 1, pulse: true });
-            break;
-          }
-          const s = 0.55 + rng() * 0.7;
-          put('crystal', x, s * 0.5, z, rng() * 6.28, s * 0.55, s * (1.3 + rng() * 0.7), s * 0.55);
-          break;
-        }
-        case 'deadTree': {
-          if (tryModel(['stump_old', 'log'], x, z, 0.7, 0.5)) break;
-          const h = 1.1 + rng() * 0.8;
-          put('deadTrunk', x, h * 0.5, z, rng() * 6.28, 1.4, h, 1.4);
-          put('branch', x, h * 0.85, z, rng() * 6.28, 1.3, 1.1, 1.3);
-          put('branch', x, h * 0.62, z, rng() * 6.28 + 2.4, 1.0, 0.9, 1.0);
-          break;
-        }
-        case 'bush': {
-          tryModel(['bush_detailed'], x, z, 0.5, 0.45); // 无程序化回退，模型缺失则跳过
-          break;
-        }
-        case 'tuft': {
-          tryModel(['grass_leafs'], x, z, 0.3, 0.4);
-          break;
-        }
-        case 'mushroom': {
-          tryModel(['mushroom_red'], x, z, 0.3, 0.35);
-          break;
-        }
-        case 'ruin': {
-          // 草原远古遗迹：方尖碑/石柱/石环
-          tryModel([pickOne(rng, ['ruin_obelisk', 'ruin_column', 'ruin_column', 'ruin_ring'])], x, z, 0.95, 0.45);
-          break;
-        }
-        case 'cactus': {
-          // 黄沙戈壁：仙人掌（Kenney CC0），缺失则跳过
-          tryModel([pickOne(rng, ['cactus_tall', 'cactus_short', 'cactus_short'])], x, z, 0.9, 0.55);
+          // 岩石群落：主巨石 + 伴生碎石 + 荒草
+          const mainRock = kind === 'snowRock' ? 'snow_rocks' : (kind === 'rockDark' ? 'stone_big' : 'stone_big');
+          tryModel([mainRock], x, z, 0.45, 0.3);
+          const c1 = spawnCompanion(x, z, 0.35, 0.7);
+          if (c1) tryModel(['stone_small', 'stone_big2'], c1.x, c1.z, 0.2, 0.2);
+          const c2 = spawnCompanion(x, z, 0.4, 0.75);
+          if (c2) tryModel(['grass_leafs'], c2.x, c2.z, 0.25, 0.2);
           break;
         }
         case 'tombstone': {
-          // 幽暗墓园：墓碑
-          tryModel([pickOne(rng, ['grave_cross', 'grave_round', 'grave_decorative'])], x, z, 0.55, 0.35);
+          // 墓地庭院：双子墓碑 + 枯松 + 铁栅栏 + 发光灯柱
+          tryModel(['grave_cross', 'grave_decorative', 'grave_round'], x, z, 0.6, 0.3);
+          const c1 = spawnCompanion(x, z, 0.4, 0.75);
+          if (c1) tryModel(['grave_round', 'grave_cross'], c1.x, c1.z, 0.45, 0.25);
+          const c2 = spawnCompanion(x, z, 0.5, 0.9);
+          if (c2) tryModel(['pine_crooked', 'fence_iron'], c2.x, c2.z, 0.7, 0.4);
           break;
         }
         case 'crypt': {
-          // 幽暗墓园：石棺/地穴
-          tryModel([pickOne(rng, ['crypt_small', 'crypt_stone', 'coffin_old'])], x, z, 0.9, 0.35);
+          // 地穴遗迹：石质墓室 + 铁栅栏 + 祭坛
+          tryModel(['crypt_stone', 'crypt_small', 'coffin_old'], x, z, 0.95, 0.3);
+          const c1 = spawnCompanion(x, z, 0.6, 1.0);
+          if (c1) tryModel(['fence_iron', 'lantern_post'], c1.x, c1.z, 0.6, 0.2, 1, true);
           break;
         }
-        case 'deadPine': {
-          // 幽暗墓园：枯木
-          tryModel(['pine_crooked'], x, z, 1.2, 0.5);
+        case 'ruin': {
+          // 远古遗迹：主石柱 + 倒塌断柱 + 瓦砾桶
+          tryModel(['ruin_obelisk', 'ruin_ring', 'ruin_column'], x, z, 1.1, 0.4);
+          const c1 = spawnCompanion(x, z, 0.5, 0.9);
+          if (c1) tryModel(['ruin_column', 'barrel'], c1.x, c1.z, 0.55, 0.3);
           break;
         }
-        case 'lantern': {
-          // 幽暗墓园：路灯
-          if (hasModel('lantern_post')) {
-            modelQueue.push({ name: 'lantern_post', x, z, h: 0.85 + rng() * 0.2, ry: rng() * 6.283, mul: 1, pulse: true });
-          }
-          break;
-        }
-        case 'spookyFence': {
-          // 幽暗墓园：铁栅栏
-          tryModel(['fence_iron'], x, z, 0.45, 0.2);
-          break;
-        }
-        case 'altar': {
-          // 幽暗墓园：石质祭坛
-          tryModel(['altar_stone'], x, z, 0.5, 0.2);
-          break;
-        }
-        case 'ghostStatue': {
-          // 幽暗墓园：幽灵雕塑
-          tryModel(['ghost_statue'], x, z, 0.65, 0.3);
+        case 'cactus': {
+          // 荒漠仙人掌群：高仙人掌 + 矮仙人掌 + 枯木 + 荒漠巨石
+          tryModel(['cactus_tall'], x, z, 0.95, 0.4);
+          const c1 = spawnCompanion(x, z, 0.4, 0.75);
+          if (c1) tryModel(['cactus_short'], c1.x, c1.z, 0.5, 0.3);
+          const c2 = spawnCompanion(x, z, 0.45, 0.8);
+          if (c2) tryModel(['stone_small', 'log'], c2.x, c2.z, 0.3, 0.2);
           break;
         }
         case 'campfire': {
-          // 熔岩篝火：石圈 + 木柴堆叠
+          // 营地：篝火 + 木柴 + 探险桶
           if (hasModel('campfire_stones')) {
-            modelQueue.push({ name: 'campfire_stones', x, z, h: 0.32 + rng() * 0.08, ry: rng() * 6.283, mul: 1 });
-            modelQueue.push({ name: 'campfire_logs', x, z, h: 0.42 + rng() * 0.1, ry: rng() * 6.283, mul: 1 });
+            modelQueue.push({ name: 'campfire_stones', x, z, h: 0.35 + rng() * 0.08, ry: rng() * 6.283, mul: 1 });
+            modelQueue.push({ name: 'campfire_logs', x, z, h: 0.45 + rng() * 0.1, ry: rng() * 6.283, mul: 1 });
           }
+          const c1 = spawnCompanion(x, z, 0.5, 0.8);
+          if (c1) tryModel(['barrel'], c1.x, c1.z, 0.4, 0.2);
           break;
         }
-        case 'iceStatue': {
-          // 霜原冰封遗迹
-          if (hasModel('ruin_ring')) {
-            modelQueue.push({
-              name: pickOne(rng, ['ruin_ring', 'ruin_column']),
-              x, z, h: 0.8 + rng() * 0.5, ry: rng() * 6.283, mul: 1, icyTint: true,
-            });
-          }
+        case 'crystal': {
+          tryModel(['crystal_large'], x, z, 0.65, 0.4, 1, true);
+          break;
+        }
+        case 'deadPine': {
+          tryModel(['pine_crooked'], x, z, 1.25, 0.4);
+          break;
+        }
+        case 'lantern': {
+          tryModel(['lantern_post'], x, z, 0.85, 0.2, 1, true);
+          break;
+        }
+        case 'altar': {
+          tryModel(['altar_stone'], x, z, 0.55, 0.2);
+          break;
+        }
+        case 'ghostStatue': {
+          tryModel(['ghost_statue', 'skeleton_statue'], x, z, 0.7, 0.3);
           break;
         }
         case 'emberRock': {
-          const s = 0.4 + rng() * 0.5;
+          const s = 0.45 + rng() * 0.5;
           put('emberBase', x, s * 0.2, z, rng() * 6.28, s, s * 0.6, s);
           put('emberGlow', x, s * 0.34, z, rng() * 6.28, s * 0.4, s * 0.18, s * 0.4);
           break;
         }
         case 'lavaPool': {
-          const r = 0.3 + rng() * 0.32;
+          const r = 0.35 + rng() * 0.35;
           add('lavaPool', null, null, { x, y: 0.021, z, ry: 0, sx: r, sy: 1, sz: r });
           break;
         }
