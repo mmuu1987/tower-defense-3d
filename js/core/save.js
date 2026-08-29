@@ -53,7 +53,7 @@ export const save = {
   },
 
   nextLevel() {
-    for (let w = 0; w < 4; w++) {
+    for (let w = 0; w < 5; w++) {
       for (let l = 0; l < 10; l++) {
         if (!this.unlockedByStars(w, l)) return null; // 管理员也不跳关：按真实进度推荐
         if (this.getStars(w, l) === 0) return { w, l };

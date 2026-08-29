@@ -4,7 +4,7 @@ import { GRID } from '../game/config.js';
 import { isPathCell } from './terrain.js';
 import { preloadModels, hasModel, makeInstance, makeInstanceWithMaterials } from './modellib.js';
 
-// 需要预热的模型清单（含塔武器）
+// 需要预热的模型清单（含塔武器与墓园/城堡扩展模型）
 const PRELOAD = [
   'tree_oak', 'tree_default', 'tree_pine_tall',
   'rock_large_b', 'stone_big', 'stone_big2', 'stone_small', 'snow_rocks', 'snow_tree',
@@ -14,6 +14,9 @@ const PRELOAD = [
   'weapon_ballista', 'weapon_cannon', 'weapon_turret', 'tower_crystals',
   'ruin_obelisk', 'ruin_column', 'ruin_ring', 'campfire_stones', 'campfire_logs',
   'cactus_short', 'cactus_tall',
+  'grave_cross', 'grave_round', 'grave_decorative', 'crypt_small', 'crypt_stone',
+  'coffin_old', 'lantern_post', 'pine_crooked', 'altar_stone', 'fence_iron',
+  'ghost_statue', 'skeleton_statue', 'barrel', 'castle_wall',
 ];
 export function initDecorModels() { return preloadModels(PRELOAD); }
 
@@ -95,6 +98,7 @@ export function scatterDecor({ theme, pathCells, seed = 12345, pathPts = null })
     bush: 9, tuft: 32, mushroom: 5,
     ruin: 4, campfire: 3, iceStatue: 4,
     cactus: 18,
+    tombstone: 18, crypt: 5, deadPine: 10, lantern: 4, spookyFence: 8, altar: 3, ghostStatue: 4,
   };
   // 模型实例队列：{name,x,z,h,ry,mul,mats?}
   const modelQueue = [];
@@ -203,6 +207,43 @@ export function scatterDecor({ theme, pathCells, seed = 12345, pathPts = null })
         case 'cactus': {
           // 黄沙戈壁：仙人掌（Kenney CC0），缺失则跳过
           tryModel([pickOne(rng, ['cactus_tall', 'cactus_short', 'cactus_short'])], x, z, 0.9, 0.55);
+          break;
+        }
+        case 'tombstone': {
+          // 幽暗墓园：墓碑
+          tryModel([pickOne(rng, ['grave_cross', 'grave_round', 'grave_decorative'])], x, z, 0.55, 0.35);
+          break;
+        }
+        case 'crypt': {
+          // 幽暗墓园：石棺/地穴
+          tryModel([pickOne(rng, ['crypt_small', 'crypt_stone', 'coffin_old'])], x, z, 0.9, 0.35);
+          break;
+        }
+        case 'deadPine': {
+          // 幽暗墓园：枯木
+          tryModel(['pine_crooked'], x, z, 1.2, 0.5);
+          break;
+        }
+        case 'lantern': {
+          // 幽暗墓园：路灯
+          if (hasModel('lantern_post')) {
+            modelQueue.push({ name: 'lantern_post', x, z, h: 0.85 + rng() * 0.2, ry: rng() * 6.283, mul: 1, pulse: true });
+          }
+          break;
+        }
+        case 'spookyFence': {
+          // 幽暗墓园：铁栅栏
+          tryModel(['fence_iron'], x, z, 0.45, 0.2);
+          break;
+        }
+        case 'altar': {
+          // 幽暗墓园：石质祭坛
+          tryModel(['altar_stone'], x, z, 0.5, 0.2);
+          break;
+        }
+        case 'ghostStatue': {
+          // 幽暗墓园：幽灵雕塑
+          tryModel(['ghost_statue'], x, z, 0.65, 0.3);
           break;
         }
         case 'campfire': {

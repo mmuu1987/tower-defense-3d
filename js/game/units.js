@@ -44,6 +44,9 @@ export const BOSS_DEFS = {
   sand:   { key:'bossSand',   name:'沙暴法老', shape:'boss', hp:5600, speed:0.72,armor:15, reward:300, size:1.1,  color:0xc9a227, fly:false,
             ability:'deathSpawn', deathSpawn:{ type:'mummy', count:4, hpMul:0.35 },
             model:{ name:'cesiumman', h:5.2, tint:0xc9a227, yaw:Math.PI } }, // 金色法老，死亡召唤干尸
+  graveyard: { key:'bossGraveyard', name:'幽冥领主', shape:'boss', hp:7000, speed:0.68, armor:18, reward:360, size:1.15, color:0x2a6048, fly:false,
+            ability:'deathSpawn', deathSpawn:{ type:'mummy', count:6, hpMul:0.35 },
+            model:{ name:'soldier', h:5.2, tint:0x1b4a36, yaw:0 } }, // 幽冥领主，死亡召唤亡灵大军
 };
 
 export const ENEMY_MODEL_NAMES = [

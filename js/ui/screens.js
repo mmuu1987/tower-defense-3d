@@ -4,7 +4,7 @@ export function createMenu({ onPlay, onSelect, onSettings }) {
   root.id = 'screen-menu';
   root.innerHTML = `
     <div class="menu-inner">
-      <h1 class="title">三境守卫</h1>
+      <div class="title-wrap"><img src="./assets/textures/ui/logo_title.png" alt="三境守卫" class="menu-logo" style="max-width:340px;height:auto;filter:drop-shadow(0 8px 16px rgba(0,0,0,0.6));"></div>
       <div class="subtitle">TRI-REALM DEFENSE</div>
       <div class="menu-btns">
         <button id="m-play" class="big">▶ 开始冒险</button>
@@ -25,7 +25,7 @@ export function createMenu({ onPlay, onSelect, onSettings }) {
 }
 
 export function createSelect({ save, onStart, onBack, onSettings }) {
-  const WORLD_NAMES = ['翠谷草原', '熔岩荒地', '霜寒要塞', '黄沙戈壁'];
+  const WORLD_NAMES = ['翠谷草原', '熔岩荒地', '霜寒要塞', '黄沙戈壁', '幽暗墓园'];
   const root = document.createElement('div');
   root.id = 'screen-select';
   root.innerHTML = `
@@ -33,7 +33,7 @@ export function createSelect({ save, onStart, onBack, onSettings }) {
       <div class="sel-head">
         <button id="s-back">← 返回</button>
         <h2>选择关卡</h2>
-        <span id="s-stars">⭐ 0/120</span>
+        <span id="s-stars">⭐ 0/150</span>
         <button id="s-admin" title="管理员">🛠</button>
         <button id="s-settings">⚙</button>
       </div>
@@ -87,7 +87,7 @@ export function createSelect({ save, onStart, onBack, onSettings }) {
       grid.appendChild(card);
     }
     root.querySelector('#s-stars').textContent =
-      `⭐ ${save.totalStars()}/120`;
+      `⭐ ${save.totalStars()}/150`;
   }
 
   function render() { renderTabs(); renderGrid(); }
@@ -97,7 +97,7 @@ export function createSelect({ save, onStart, onBack, onSettings }) {
   // ———— 管理员面板：全解锁 / 任意跳转 / 清空进度 ————
   const adminPanel = root.querySelector('#panel-admin');
   const adminBtn = root.querySelector('#s-admin');
-  const WORLD_ABBR = ['翠谷', '熔岩', '霜寒', '黄沙'];
+  const WORLD_ABBR = ['翠谷', '熔岩', '霜寒', '黄沙', '墓园'];
   function refreshAdminBtn() {
     adminBtn.textContent = save.isAdmin() ? '🛠✓' : '🛠';
     adminBtn.title = save.isAdmin() ? '管理员模式：已解锁全部（点击管理）' : '管理员';
@@ -106,7 +106,7 @@ export function createSelect({ save, onStart, onBack, onSettings }) {
   function buildAdminGrid() {
     const grid = root.querySelector('#ad-grid');
     grid.innerHTML = '';
-    for (let w = 0; w < 4; w++) {
+    for (let w = 0; w < 5; w++) {
       const row = document.createElement('div');
       row.className = 'ad-row';
       row.innerHTML = `<b>${WORLD_ABBR[w]}</b>`;

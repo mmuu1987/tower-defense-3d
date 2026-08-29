@@ -42,6 +42,15 @@ export const THEMES = [
     pathTint: 0xb99b6b, accent: 0xffb347,
     decor: ['cactus', 'rock', 'ruin', 'deadTree'],
   },
+  {
+    id: 'graveyard', name: '幽暗墓园',
+    skyTop: 0x160c2b, skyBottom: 0x0f2a1e, fog: 0x182622, fogNear: 28, fogFar: 120,
+    sunColor: 0xa8f5c8, sunIntensity: 2.3,
+    hemiSky: 0x4f366b, hemiGround: 0x122a1e, hemiIntensity: 0.65,
+    groundTex: '', groundFallback: 'dark', groundTint: 0x243026,
+    pathTint: 0x3c493f, accent: 0x59f9a8,
+    decor: ['tombstone', 'crypt', 'deadPine', 'lantern', 'spookyFence', 'altar', 'ghostStatue'],
+  },
 ];
 
 export const QUALITY_PRESETS = {
@@ -51,3 +60,4 @@ export const QUALITY_PRESETS = {
 };
 
 export function themeForWorld(worldIdx) { return THEMES[Math.max(0, Math.min(THEMES.length - 1, worldIdx))]; }
+

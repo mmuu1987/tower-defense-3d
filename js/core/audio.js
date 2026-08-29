@@ -170,6 +170,7 @@ export class AudioEngine {
       lava:   { root: 174.6, scale: [0, 1, 4, 5, 7], bpm: 66, pad: 'sawtooth' },
       frost:  { root: 196, scale: [0, 2, 3, 7, 10], bpm: 74, pad: 'triangle' },
       sand:   { root: 164.8, scale: [0, 1, 4, 5, 8], bpm: 70, pad: 'sawtooth' }, // 弗里几亚主导：荒漠感
+      graveyard: { root: 146.8, scale: [0, 1, 3, 6, 7, 8], bpm: 60, pad: 'sawtooth' }, // 幽冥暗夜调式
     }[themeId] || { root: 220, scale: [0, 2, 4], bpm: 80, pad: 'sine' };
     const beat = 60 / conf.bpm;
     let step = 0;
