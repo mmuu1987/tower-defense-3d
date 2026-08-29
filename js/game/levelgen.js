@@ -6,25 +6,27 @@ import { mapForLevel } from './maps.js';
 // 问题背景：旧曲线 hpMul 是关卡常数 → 关卡内越往后敌人相对越弱，
 // 而玩家收入（击杀赏金+波次奖金）持续累积 → 开局漏怪、中后期必然全歼（难度倒挂）。
 export const BALANCE = {
-  startGoldBase: 240,      // 开局金（原 220：首波前只够 3 座箭塔，开局漏怪高发）
-  startGoldPerD: 14,
-  waveSurplusBase: 2.0,    // 关卡内最终波额外强度（d=0 时约 +2.4x→随 d 衰减），对冲经济富余
-  waveSurplusHalfD: 16,    // 富余衰减半衰期（难度点）：高难度关卡本身已紧张，爬坡放缓防叠加过量
-  waveRewardFraction: 0.5, // 赏金爬坡 = HP 爬坡 × 此比例（压制滚雪球但不饿死玩家）
-  earlyCountRamp: 0.70,    // 前三波数量折扣 0.70/0.80/0.90（开局手牌少，先给玩家喘息）
-  earlyGapBonus: 0.14,     // 前两波出怪间隔加宽（每只 +0.14s，给塔留输出窗口）
+  startGoldBase: 280,      // 开局基础金
+  startGoldPerWorld: 160,  // 每进一个新世界额外开局金（确保高难度世界开局可直接部署 2-3 级塔）
+  startGoldPerLvl: 18,     // 关卡微增
+  waveSurplusBase: 1.6,    // 关卡内最终波额外强度
+  waveSurplusHalfD: 20,    // 富余衰减半衰期
+  waveRewardFraction: 0.5, // 赏金爬坡 = HP 爬坡 × 此比例
+  earlyCountRamp: 0.65,    // 前三波数量折扣 0.65/0.75/0.85（开局手牌少，先给玩家喘息）
+  earlyGapBonus: 0.20,     // 前两波出怪间隔加宽（每只 +0.20s，给塔留输出窗口）
 };
 
 export function buildLevel(worldIdx, lvlIdx, overrides = {}) {
   const d = worldIdx * 10 + lvlIdx;
-  const waveCount = 6 + Math.floor(d / 3);            // 6 → 15 波
-  const hpMul = Math.pow(1.085, d);                   // 1x → ~11x
-  const speedMul = 1 + Math.min(0.28, d * 0.01);      // 1x → 1.28x
-  const rewardMul = Math.pow(1.085, d);               // 1x → ~11x
-  const countMul = 1 + d * 0.04;                      // 数量缓增
+  // 波次长度：6 波（第 1 世界）→ 15 波（第 5 世界），每小关耗时 2.5~4 分钟节奏紧凑
+  const waveCount = 6 + Math.floor(d / 4.5);
+  // 50 关平滑指数曲线：从 1x 平稳过渡到 ~10x（与 5 阶塔升级成长精准匹配）
+  const hpMul = Math.pow(1.048, d);                   // 1x → 9.8x
+  const speedMul = 1 + Math.min(0.18, d * 0.004);     // 1x → 1.18x 适度提速
+  const rewardMul = Math.pow(1.048, d);               // 奖励同步爬坡
+  const countMul = 1 + d * 0.03;                      // 数量缓增
 
   // 关卡内波次 HP 爬坡：把"最终波额外强度"摊到各波（前两波免爬坡，见 battle.startWave）。
-  // 低难度关（教学世界）玩家 DPS 富余大 → 爬坡陡；高难度关间 hpMul 已陡 → 爬坡放缓。
   const surplus = BALANCE.waveSurplusBase / (1 + d / BALANCE.waveSurplusHalfD);
   const waveHpRamp = surplus / Math.max(4, waveCount - 2);
   const waveRewardRamp = waveHpRamp * BALANCE.waveRewardFraction;
@@ -42,6 +44,9 @@ export function buildLevel(worldIdx, lvlIdx, overrides = {}) {
   if (d >= 19) pool.push('stork');
   if (d >= 21) pool.push('dancer');
 
+  // 开局先锋怪池：前两波永远只刷基础步兵/疾行者，杜绝首波直接出高甲肉盾/萨满/极速灵狐导致开局崩盘
+  const starterPool = (d >= 2) ? ['grunt', 'runner'] : ['grunt'];
+
   const waves = [];
   for (let w = 0; w < waveCount; w++) {
     const groups = [];
@@ -56,23 +61,27 @@ export function buildLevel(worldIdx, lvlIdx, overrides = {}) {
       continue;
     }
 
-    // 基础波：主兵种 + 解锁池副兵种（间隔拉开，避免瞬时血量洪峰）
-    const main = pool[Math.floor((w * 0.7 + lvlIdx)) % pool.length];
+    // 基础波：前 2 波使用 starterPool 先锋池，第 3 波起开放全怪池
+    const activePool = (w < 2) ? starterPool : pool;
+    const main = (w === 0)
+      ? starterPool[lvlIdx % starterPool.length]
+      : activePool[Math.floor((w * 0.7 + lvlIdx)) % activePool.length];
+
     // 开局软化：前三波数量打折（玩家手牌少，先给喘息），第 4 波起恢复全量
     const earlyCount = w >= 3 ? 1 : BALANCE.earlyCountRamp + 0.10 * w;
-    const mainCount = Math.max(4, Math.round((5 + w * 0.8 + lvlIdx * 0.5) * countMul * earlyCount));
+    const mainCount = Math.max(4, Math.round((5 + w * 0.8 + lvlIdx * 0.4) * countMul * earlyCount));
     // 前两波出怪间隔加宽：拉开首波血量洪峰，初始 2-3 座塔也接得住
     const earlyGap = w < 2 ? (2 - w) * BALANCE.earlyGapBonus : 0;
-    groups.push({ type: main, count: mainCount, gap: Math.max(0.72, 1.1 - w * 0.045) + earlyGap, delay: 0.5 });
+    groups.push({ type: main, count: mainCount, gap: Math.max(0.75, 1.15 - w * 0.04) + earlyGap, delay: 0.5 });
 
-    if (pool.length > 1 && w % 2 === 1) {
-      const sub = pool[(w + lvlIdx + 1) % pool.length];
+    if (activePool.length > 1 && w % 2 === 1) {
+      const sub = activePool[(w + lvlIdx + 1) % activePool.length];
       if (sub !== main) {
         groups.push({ type: sub, count: Math.round(mainCount * 0.35), gap: 0.85, delay: 5.5 });
       }
     }
-    if (isElite) {
-      groups.push({ type: 'tank', count: 2 + Math.floor(d / 12), gap: 2.0, delay: 8 });
+    if (isElite && w >= 2) {
+      groups.push({ type: 'tank', count: 2 + Math.floor(d / 15), gap: 2.2, delay: 8 });
     }
     waves.push({ groups });
   }
@@ -85,7 +94,7 @@ export function buildLevel(worldIdx, lvlIdx, overrides = {}) {
     hpMul, speedMul, rewardMul,
     waveHpRamp: overrides.waveHpRamp ?? waveHpRamp,        // 关卡内波次爬坡（battle 按波应用）
     waveRewardRamp: overrides.waveRewardRamp ?? waveRewardRamp,
-    startGold: BALANCE.startGoldBase + d * BALANCE.startGoldPerD,
+    startGold: BALANCE.startGoldBase + worldIdx * BALANCE.startGoldPerWorld + lvlIdx * BALANCE.startGoldPerLvl,
     lives: 20,
     intermission: 6,
     unlockPool: pool,
