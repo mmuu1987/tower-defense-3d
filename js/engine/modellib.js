@@ -178,6 +178,34 @@ export function loadEnemyTemplate(name, timeoutMs = 20000) {
               if (before !== clip.tracks.length) clip.resetDuration();
             }
             if (stripped) console.log(`[enemy] ${name}: stripped ${stripped} position tracks`);
+            // 关键修复（T-pose 根因）：节点无名字时 GLTFLoader 用 uuid 当动画轨道目标名，
+            // 而 SkeletonUtils.clone() 会给克隆体分配全新 uuid → PropertyBinding 解析不到目标
+            // → 整条剪辑静默失效 → 模型定格在绑定姿态（brainstem 实测 38/38 轨道全失败）。
+            // 对策：给无名节点赋稳定名并把轨道名从 uuid 改写为该名字（克隆保留 name，绑定即可命中）。
+            {
+              const uuidToName = new Map();
+              let idx = 0;
+              root.traverse((o) => {
+                if (!o.name) {
+                  o.name = `_n${idx}`;
+                  uuidToName.set(o.uuid, o.name);
+                }
+                idx++;
+              });
+              if (uuidToName.size) {
+                let rewritten = 0;
+                for (const clip of g.animations || []) {
+                  for (const tr of clip.tracks) {
+                    const dot = tr.name.indexOf('.');
+                    if (dot <= 0) continue;
+                    const target = tr.name.slice(0, dot);
+                    const mapped = uuidToName.get(target);
+                    if (mapped) { tr.name = mapped + tr.name.slice(dot); rewritten++; }
+                  }
+                }
+                console.log(`[enemy] ${name}: named ${uuidToName.size} anonymous nodes, rewrote ${rewritten} tracks`);
+              }
+            }
             // 高度测量：对 SkinnedMesh 用 getVertexPosition 抽样蒙皮顶点（含骨骼变换），
             // 这是唯一与最终渲染一致的口径；Box3/骨骼局部包围盒都会因单位制差异而失真。
             root.updateWorldMatrix(true, true);

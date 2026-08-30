@@ -12,12 +12,13 @@ export const ENEMY_DEFS = {
               model:{ name:'bird_parrot', h:1.3, tint:null, yaw:Math.PI } },
   healer:   { key:'healer',   name:'萨满',   shape:'healer',   hp:85,  speed:1.3,  armor:2, reward:12, size:0.32, color:0x4ac8b8, fly:false,
               heal:{ radius:2.3, hps:7 },
-              // Soldier.glb 原生面向 -Z（历史实测），yaw=0 才面朝行进方向；设 π 会 180° 倒退走
+              // Soldier.glb 原生面向 -Z：骨骼解剖学三重实测（脚趾/拇指/膝前突 dz 全 <0）→ yaw=0
               model:{ name:'soldier', h:1.8, tint:0x3aa898, yaw:0 } },
   splitter: { key:'splitter', name:'裂变体', shape:'splitter', hp:92,  speed:1.35, armor:1, reward:9,  size:0.38, color:0xc85a88, fly:false,
               splitInto:{ type:'grunt', count:2, hpMul:0.45, rewardMul:0.5 },
-              // Xbot.glb 原生面向 -Z（历史实测），同上
-              model:{ name:'xbot', h:1.65, tint:0xb04a78, yaw:0 } },
+              // Xbot.glb 原生面向 +Z：骨骼解剖学三重实测（脚趾/拇指/膝前突 dz 全 >0 且左右一致，
+              // tools/mixamocheck.mjs）→ 与 Soldier（全 <0）相反，故此处必须 π，不能跟 soldier 一样填 0
+              model:{ name:'xbot', h:1.65, tint:0xb04a78, yaw:Math.PI } },
   // ———— 扩充包（d≥13 逐步解锁；朝向均经特写实测）————
   fox:      { key:'fox',      name:'灵狐',   shape:'runner',   hp:44,  speed:3.3,  armor:0, reward:7,  size:0.26, color:0xd9762b, fly:false,
               model:{ name:'fox', h:1.15, tint:null, yaw:Math.PI } }, // Fox.glb 原生 +Z（CC0, Walk/Run）
@@ -37,7 +38,7 @@ export const BOSS_DEFS = {
             model:{ name:'robot', h:3.4, tint:0x2f6d28, yaw:Math.PI } },
   lava:   { key:'bossLava',   name:'熔火之心', shape:'boss', hp:2600, speed:0.75,armor:12, reward:180, size:0.95, color:0xb03a18, fly:false,
             ability:'deathSpawn', deathSpawn:{ type:'grunt', count:4, hpMul:0.35 },
-            model:{ name:'xbot', h:4.6, tint:0x7a1f08, yaw:0 } }, // Xbot 原生 -Z
+            model:{ name:'xbot', h:4.6, tint:0x7a1f08, yaw:Math.PI } }, // Xbot 原生 +Z（骨骼实测）
   frost:  { key:'bossFrost',  name:'冰霜君王', shape:'boss', hp:4200, speed:0.7, armor:16, reward:260, size:1.05, color:0x4a7dbd, fly:false,
             ability:'shield', shield:{ hp:420, cd:5 },
             model:{ name:'soldier', h:5.0, tint:0x35619e, yaw:0 } }, // Soldier 原生 -Z
