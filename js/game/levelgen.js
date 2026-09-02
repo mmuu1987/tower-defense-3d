@@ -2,9 +2,11 @@
 import { ENEMY_DEFS, BOSS_DEFS } from './units.js';
 import { mapForLevel } from './maps.js';
 
-// —— 平衡常数（集中于此便于调参；tools/balance-probe.mjs 可运行时覆盖做扫描）——
-// 问题背景：旧曲线 hpMul 是关卡常数 → 关卡内越往后敌人相对越弱，
-// 而玩家收入（击杀赏金+波次奖金）持续累积 → 开局漏怪、中后期必然全歼（难度倒挂）。
+// —— 平衡常数（集中于此便于调参；tools/econprobe.mjs / balance-probe.mjs 可运行时覆盖做扫描）——
+// 历史问题①：hpMul 曾是关卡常数 → 关卡内越往后敌人相对越弱（波次爬坡已修）。
+// 历史问题②（本轮）：塔在世界 4 即 12 座全满 Lv5 封顶，金币再无出口（世界5 剩金 41200 = 收入 75%），
+//   而敌人 HP 仅 1.048^d→9.95x，玩家总火力（塔数 4x × 单塔 DPS 10~23x）达 40~90x → 中后期零压力。
+//   对策：敌人后期加速爬坡 + 高阶升级提价（造出金币出口）+ 后期收入增速低于 HP 增速。
 export const BALANCE = {
   startGoldBase: 280,      // 开局基础金
   startGoldPerWorld: 160,  // 每进一个新世界额外开局金（确保高难度世界开局可直接部署 2-3 级塔）
@@ -14,17 +16,41 @@ export const BALANCE = {
   waveRewardFraction: 0.5, // 赏金爬坡 = HP 爬坡 × 此比例
   earlyCountRamp: 0.65,    // 前三波数量折扣 0.65/0.75/0.85（开局手牌少，先给玩家喘息）
   earlyGapBonus: 0.20,     // 前两波出怪间隔加宽（每只 +0.20s，给塔留输出窗口）
+  // ——— 难度主曲线（本轮按用户要求：终局约现在的 2 倍，世界1-2 完全不动）———
+  hpBase: 1.048,           // HP 基础指数（世界1-2 手感已验证良好，不动）
+  hpLateFrom: 14,          // 后期加速起点（难度点 d，约世界2中段；之前的关卡零影响）
+  hpLatePow: 1.35,         // 后期加速幂次
+  hpLateK: 0.010,          // 后期加速系数：W3 ×1.1~1.4、W4 ×1.4~1.8、W5 ×1.8~2.2（终局 9.95→22.0）
+  // ——— 经济（收入增速刻意低于 HP 增速，杜绝后期钱花不完）———
+  rewardBase: 1.048,       // 击杀赏金指数：刻意不跟随 HP 后期加速
+                           // → 敌人变硬但赏金不变 = "每点血赚的钱"自然下降，最自然的收紧方式
+  rewardLateK: 0,          // 后期赏金加速（0 = 完全不加速）
+  waveBonusBase: 60,       // 清波奖金基数（保持：高阶升级提价已经吸走富余，不必再砍收入）
+  waveBonusPerWave: 10,    // 每波递增
+  // ——— 数量与速度（制造"波次更密、推进更快"的压迫感，且不像 HP 那样直接放大赏金总量）———
+  countPerD: 0.03,         // 数量随难度线性增长
+  countLateFrom: 20,       // 数量后期加速起点
+  countLateK: 0.012,       // 数量后期加速系数
+  speedCap: 0.26,          // 移速上限增幅（原 0.18）
+  speedPerD: 0.005,        // 移速增速（原 0.004）
 };
 
 export function buildLevel(worldIdx, lvlIdx, overrides = {}) {
   const d = worldIdx * 10 + lvlIdx;
   // 波次长度：6 波（第 1 世界）→ 15 波（第 5 世界），每小关耗时 2.5~4 分钟节奏紧凑
   const waveCount = 6 + Math.floor(d / 4.5);
-  // 50 关平滑指数曲线：从 1x 平稳过渡到 ~10x（与 5 阶塔升级成长精准匹配）
-  const hpMul = Math.pow(1.048, d);                   // 1x → 9.8x
-  const speedMul = 1 + Math.min(0.18, d * 0.004);     // 1x → 1.18x 适度提速
-  const rewardMul = Math.pow(1.048, d);               // 奖励同步爬坡
-  const countMul = 1 + d * 0.03;                      // 数量缓增
+  // HP 曲线：前期温和指数，中后期加速——对冲"塔封顶后火力过剩"
+  const lateD = Math.max(0, d - BALANCE.hpLateFrom);
+  const hpLateMul = 1 + Math.pow(lateD, BALANCE.hpLatePow) * BALANCE.hpLateK;
+  const hpMul = Math.pow(BALANCE.hpBase, d) * hpLateMul;
+  const speedMul = 1 + Math.min(BALANCE.speedCap, d * BALANCE.speedPerD);
+  // 赏金：只走基础指数（+可选后期加速），刻意慢于 HP → 后期金币变紧
+  const rewardLateD = Math.max(0, d - BALANCE.hpLateFrom);
+  const rewardMul = Math.pow(BALANCE.rewardBase, d) *
+    (1 + Math.pow(rewardLateD, BALANCE.hpLatePow) * BALANCE.rewardLateK);
+  // 数量：线性 + 后期加速（波次更密）
+  const countLateD = Math.max(0, d - BALANCE.countLateFrom);
+  const countMul = 1 + d * BALANCE.countPerD + countLateD * BALANCE.countLateK;
 
   // 关卡内波次 HP 爬坡：把"最终波额外强度"摊到各波（前两波免爬坡，见 battle.startWave）。
   const surplus = BALANCE.waveSurplusBase / (1 + d / BALANCE.waveSurplusHalfD);
@@ -95,6 +121,8 @@ export function buildLevel(worldIdx, lvlIdx, overrides = {}) {
     waveHpRamp: overrides.waveHpRamp ?? waveHpRamp,        // 关卡内波次爬坡（battle 按波应用）
     waveRewardRamp: overrides.waveRewardRamp ?? waveRewardRamp,
     startGold: BALANCE.startGoldBase + worldIdx * BALANCE.startGoldPerWorld + lvlIdx * BALANCE.startGoldPerLvl,
+    waveBonusBase: BALANCE.waveBonusBase,
+    waveBonusPerWave: BALANCE.waveBonusPerWave,
     lives: 20,
     intermission: 6,
     unlockPool: pool,

@@ -1,4 +1,7 @@
-// 防御塔图鉴：5 塔 × 3 级 + 程序化塔身 + Kenney 武器模型替换（失败回退程序化）
+// 防御塔图鉴：5 塔 × 5 级 + 程序化塔身 + Kenney 武器模型替换（失败回退程序化）
+// 造价设计（2026-09-02 平衡轮）：Lv1-3 沿用旧价（前期手感已验证），
+//   Lv4/Lv5 大幅提价 —— 后期塔全满级后金币无出口是"中后期无压力+钱花不完"的核心成因，
+//   把满级做成真正昂贵的长期目标，让富余金币有地方去（数据见 tools/econprobe.mjs）。
 import * as THREE from 'three';
 import { hasModel, makeInstance, makeInstanceWithMaterials, loadOne } from '../engine/modellib.js';
 
@@ -20,8 +23,8 @@ export const TOWER_DEFS = {
       null,
       { cost: 60,  dmg: 24, rate: 1.4,  range: 3.7 },
       { cost: 115, dmg: 38, rate: 1.6,  range: 4.1 },
-      { cost: 190, dmg: 60, rate: 1.85, range: 4.5 },
-      { cost: 310, dmg: 98, rate: 2.2,  range: 5.0 },
+      { cost: 340, dmg: 60, rate: 1.85, range: 4.5 },
+      { cost: 780, dmg: 98, rate: 2.2,  range: 5.0 },
     ],
   },
   cannon: {
@@ -31,8 +34,8 @@ export const TOWER_DEFS = {
       null,
       { cost: 100, dmg: 52, rate: 0.58, range: 3.3, splash: 1.9 },
       { cost: 170, dmg: 85, rate: 0.62, range: 3.5, splash: 2.2 },
-      { cost: 280, dmg: 140, rate: 0.68, range: 3.8, splash: 2.6 },
-      { cost: 450, dmg: 235, rate: 0.75, range: 4.2, splash: 3.1 },
+      { cost: 500, dmg: 140, rate: 0.68, range: 3.8, splash: 2.6 },
+      { cost: 1120, dmg: 235, rate: 0.75, range: 4.2, splash: 3.1 },
     ],
   },
   frost: {
@@ -42,8 +45,8 @@ export const TOWER_DEFS = {
       null,
       { cost: 80,  dmg: 18, rate: 0.95, range: 3.1, slow: { pct: 0.55, dur: 2.3 } },
       { cost: 140, dmg: 30, rate: 1.0,  range: 3.4, slow: { pct: 0.62, dur: 2.7 } },
-      { cost: 230, dmg: 48, rate: 1.1,  range: 3.7, slow: { pct: 0.70, dur: 3.1 } },
-      { cost: 370, dmg: 80, rate: 1.25, range: 4.2, slow: { pct: 0.78, dur: 3.6 } },
+      { cost: 410, dmg: 48, rate: 1.1,  range: 3.7, slow: { pct: 0.70, dur: 3.1 } },
+      { cost: 920, dmg: 80, rate: 1.25, range: 4.2, slow: { pct: 0.78, dur: 3.6 } },
     ],
   },
   tesla: {
@@ -53,8 +56,8 @@ export const TOWER_DEFS = {
       null,
       { cost: 110, dmg: 30, rate: 0.85, range: 3.4, chains: 4 },
       { cost: 190, dmg: 48, rate: 0.9,  range: 3.7, chains: 5 },
-      { cost: 300, dmg: 76, rate: 1.0,  range: 4.0, chains: 7 },
-      { cost: 480, dmg: 125, rate: 1.15, range: 4.4, chains: 9 },
+      { cost: 560, dmg: 76, rate: 1.0,  range: 4.0, chains: 7 },
+      { cost: 1250, dmg: 125, rate: 1.15, range: 4.4, chains: 9 },
     ],
   },
   sniper: {
@@ -64,8 +67,8 @@ export const TOWER_DEFS = {
       null,
       { cost: 130, dmg: 115, rate: 0.38, range: 7.0 },
       { cost: 210, dmg: 180, rate: 0.42, range: 7.5 },
-      { cost: 330, dmg: 290, rate: 0.48, range: 8.2 },
-      { cost: 520, dmg: 460, rate: 0.55, range: 9.0 },
+      { cost: 620, dmg: 290, rate: 0.48, range: 8.2 },
+      { cost: 1380, dmg: 460, rate: 0.55, range: 9.0 },
     ],
   },
 };

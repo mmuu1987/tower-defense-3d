@@ -204,8 +204,10 @@ export class Battle {
           this.hooks.onEnd?.({ win: true });
           return;
         }
-        // 波次奖励金：帮玩家跟上强度曲线
-        const bonus = 60 + (this.waveIdx + 1) * 10;
+        // 波次奖励金：帮玩家跟上强度曲线（基数/递增可由关卡覆盖，见 levelgen BALANCE）
+        const bonus = Math.round(
+          (this.level.waveBonusBase ?? 60) + (this.waveIdx + 1) * (this.level.waveBonusPerWave ?? 10),
+        );
         this.gold += bonus;
         this.hooks.onGold?.(this.gold);
         this.intermission = this.level.intermission;
